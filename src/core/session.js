@@ -38,6 +38,14 @@ export function partyAwards(scores){
   return scores.map(score=>points[distinct.indexOf(score)]||0);
 }
 
+export function rankScores(scores){
+  const ordered=scores.map((score,index)=>({index,score})).sort((a,b)=>b.score-a.score||a.index-b.index);
+  return ordered.map((row,pos)=>({
+    ...row,
+    rank:pos===0?1:(row.score===ordered[pos-1].score?ordered[pos-1].rank:pos+1)
+  }));
+}
+
 export class SessionStore{
   constructor({storage=globalThis.localStorage,transport=null}={}){
     this.storage=storage;this.transport=transport;
