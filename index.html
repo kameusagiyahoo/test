@@ -1,72 +1,23 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<meta name="theme-color" content="#fff8ef" />
-<title>Party Pocket</title>
-<style>
-:root{font-family:Inter,ui-rounded,"Hiragino Sans","Yu Gothic",system-ui,-apple-system,sans-serif;color:#202020;background:#fff8ef;--ink:#202020;--muted:#716d68;--paper:#fffdf8;--line:#ddd5ca;--yellow:#ffd95a;--pink:#ff8fa3;--blue:#7cc9ff;--green:#82d6a1;--orange:#ffad66}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(180deg,#fff9ef 0%,#f8f3eb 100%);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}button,input{font:inherit}button{touch-action:manipulation}.wrap{width:min(760px,100%);margin:auto;padding:18px 16px 40px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.brand{font-weight:900;letter-spacing:-.04em;font-size:22px}.pill{font-size:12px;font-weight:800;border:1px solid var(--line);background:var(--paper);padding:7px 10px;border-radius:999px;color:var(--muted)}.hero{border:2px solid var(--ink);border-radius:26px;background:var(--yellow);padding:28px 24px;box-shadow:6px 6px 0 var(--ink);margin-bottom:22px}.hero h1{font-size:clamp(38px,12vw,72px);line-height:.9;letter-spacing:-.07em;margin:0 0 14px}.hero p{margin:0;font-weight:700;line-height:1.6}.section-title{display:flex;justify-content:space-between;align-items:end;margin:26px 0 12px}.section-title h2{margin:0;font-size:20px}.section-title span{font-size:12px;color:var(--muted)}.panel{border:2px solid var(--ink);border-radius:22px;background:var(--paper);padding:18px;box-shadow:4px 4px 0 var(--ink)}.players{display:grid;gap:9px}.player-row{display:grid;grid-template-columns:40px 1fr 42px;gap:8px;align-items:center}.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--ink);font-weight:900}.player-row:nth-child(4n+1) .avatar{background:var(--pink)}.player-row:nth-child(4n+2) .avatar{background:var(--blue)}.player-row:nth-child(4n+3) .avatar{background:var(--green)}.player-row:nth-child(4n) .avatar{background:var(--orange)}input{width:100%;border:1.5px solid var(--line);background:white;border-radius:12px;padding:11px 12px;outline:none}input:focus{border-color:var(--ink)}.icon-btn,.ghost,.primary,.choice,.game-card,.num-btn,.judge{border:2px solid var(--ink);cursor:pointer}.icon-btn{height:40px;border-radius:12px;background:white;font-weight:900}.player-actions{display:flex;gap:9px;margin-top:12px}.ghost,.primary{border-radius:14px;padding:11px 14px;font-weight:900}.ghost{background:white}.primary{background:var(--ink);color:white}.games{display:grid;gap:12px}.game-card{text-align:left;border-radius:22px;padding:19px;background:white;box-shadow:4px 4px 0 var(--ink);transition:.12s transform}.game-card:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--ink)}.game-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.emoji{font-size:32px}.game-card h3{font-size:23px;margin:8px 0 5px}.game-card p{margin:0;color:var(--muted);line-height:1.5;font-weight:600}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.tag{font-size:11px;font-weight:900;border:1.5px solid var(--ink);padding:5px 8px;border-radius:999px}.g1{background:#fff0f3}.g2{background:#eef8ff}.g3{background:#effaf2}.screen{display:none}.screen.active{display:block}.game-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}.back{border:2px solid var(--ink);background:white;border-radius:12px;width:44px;height:44px;font-size:20px}.game-title{font-size:24px;font-weight:900;letter-spacing:-.04em}.scorebar{display:flex;gap:7px;overflow:auto;padding:2px 1px 8px;scrollbar-width:none}.score{flex:0 0 auto;border:1.5px solid var(--ink);background:white;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:900}.score.current{background:var(--yellow)}.stage{border:2px solid var(--ink);border-radius:25px;background:white;padding:22px;box-shadow:5px 5px 0 var(--ink);min-height:390px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:900;color:var(--muted)}.prompt{font-size:clamp(30px,9vw,52px);line-height:1.05;letter-spacing:-.05em;font-weight:900;margin:14px 0 18px}.sub{color:var(--muted);font-weight:650;line-height:1.55}.choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}.choice{min-height:78px;border-radius:17px;background:#fffdf8;font-size:18px;font-weight:900}.choice:active{background:var(--yellow)}.big-btn{width:100%;margin-top:18px;padding:16px;border-radius:16px}.reveal-list{display:grid;gap:9px;margin-top:18px}.reveal{display:flex;justify-content:space-between;border:1.5px solid var(--line);padding:12px 14px;border-radius:14px;font-weight:850}.turn-name{display:inline-block;background:var(--yellow);border:2px solid var(--ink);border-radius:999px;padding:7px 12px;font-weight:900;margin-top:5px}.bomb-number{font-size:104px;line-height:1;text-align:center;font-weight:950;letter-spacing:-.08em;margin:24px 0 5px}.danger{color:#e64b4b}.num-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:22px}.num-btn{border-radius:18px;padding:18px 8px;background:white;font-weight:950;font-size:20px}.num-btn:active{background:var(--blue)}.timer{font-size:92px;font-weight:950;text-align:center;line-height:1;margin:26px 0;letter-spacing:-.08em}.timer.running{font-variant-numeric:tabular-nums}.judge-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.judge{padding:16px;border-radius:16px;font-weight:950}.ok{background:var(--green)}.ng{background:var(--pink)}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:white;padding:11px 15px;border-radius:999px;font-size:13px;font-weight:850;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1}.rules{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px;color:var(--muted);font-size:13px;line-height:1.6}.footer{text-align:center;color:#9b948c;font-size:12px;margin-top:28px}@media(min-width:640px){.games{grid-template-columns:repeat(3,1fr)}.game-card{min-height:230px}.wrap{padding-top:28px}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#fff8ef" />
+  <title>Party Pocket</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-<div class="wrap">
-<section id="home" class="screen active">
-  <div class="top"><div class="brand">PARTY POCKET</div><div class="pill">2〜8人・スマホ1台</div></div>
-  <div class="hero"><h1>集まったら、<br>すぐ遊ぶ。</h1><p>説明30秒。道具なし。スマホを回すだけのミニゲーム集。</p></div>
-  <div class="section-title"><h2>プレイヤー</h2><span>名前は端末に保存</span></div>
-  <div class="panel"><div id="players" class="players"></div><div class="player-actions"><button class="ghost" id="addPlayer">＋ 追加</button><button class="primary" id="savePlayers">このメンバーで遊ぶ</button></div></div>
-  <div class="section-title"><h2>ゲームを選ぶ</h2><span>3 games</span></div>
-  <div class="games">
-    <button class="game-card g1" data-game="sync"><div class="game-head"><div><div class="tag">読み合い</div><h3>シンクロ</h3></div><div class="emoji">🎯</div></div><p>お題に対して同じ答えを選べるか。簡単なのに性格が出る。</p><div class="tags"><span class="tag">2〜8人</span><span class="tag">3分</span></div></button>
-    <button class="game-card g2" data-game="bomb"><div class="game-head"><div><div class="tag">駆け引き</div><h3>21ボム</h3></div><div class="emoji">💣</div></div><p>1〜3進めて「21」を踏んだら負け。単純だからこそ熱い。</p><div class="tags"><span class="tag">2〜8人</span><span class="tag">2分</span></div></button>
-    <button class="game-card g3" data-game="five"><div class="game-head"><div><div class="tag">瞬発力</div><h3>5秒チャレンジ</h3></div><div class="emoji">⚡️</div></div><p>5秒で3つ答えろ。焦るほど、妙な答えが飛び出す。</p><div class="tags"><span class="tag">2〜8人</span><span class="tag">5分</span></div></button>
+  <div class="app-shell">
+    <header class="app-header">
+      <button id="homeButton" class="header-home" type="button">PARTY POCKET</button>
+      <div id="sessionBadge" class="session-badge">2〜8人</div>
+    </header>
+
+    <main id="app"></main>
   </div>
-  <div class="footer">Party Pocket — built on GitHub Pages</div>
-</section>
 
-<section id="sync" class="screen"><div class="game-top"><button class="back">←</button><div class="game-title">🎯 シンクロ</div></div><div class="scorebar" data-scorebar></div><div class="stage" id="syncStage"></div></section>
-<section id="bomb" class="screen"><div class="game-top"><button class="back">←</button><div class="game-title">💣 21ボム</div></div><div class="scorebar" data-scorebar></div><div class="stage" id="bombStage"></div></section>
-<section id="five" class="screen"><div class="game-top"><button class="back">←</button><div class="game-title">⚡️ 5秒チャレンジ</div></div><div class="scorebar" data-scorebar></div><div class="stage" id="fiveStage"></div></section>
-</div><div id="toast" class="toast"></div>
-<script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const colors=['#ff8fa3','#7cc9ff','#82d6a1','#ffad66','#d7b7ff','#8de1d3','#ffd95a','#b7c7ff'];
-let names=JSON.parse(localStorage.getItem('partyPocketPlayers')||'null')||['プレイヤー1','プレイヤー2'];
-let scores=[]; let currentGame='home';
-function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function renderPlayers(){ $('#players').innerHTML=names.map((n,i)=>`<div class="player-row"><div class="avatar" style="background:${colors[i]}">${i+1}</div><input maxlength="16" value="${esc(n)}" data-player="${i}" aria-label="プレイヤー${i+1}名"><button class="icon-btn" data-remove="${i}" ${names.length<=2?'disabled':''}>×</button></div>`).join(''); $$('[data-player]').forEach(el=>el.oninput=e=>names[+e.target.dataset.player]=e.target.value||`プレイヤー${+e.target.dataset.player+1}`); $$('[data-remove]').forEach(b=>b.onclick=()=>{if(names.length>2){names.splice(+b.dataset.remove,1);renderPlayers()}})}
-function savePlayers(){names=names.map((n,i)=>n.trim()||`プレイヤー${i+1}`);localStorage.setItem('partyPocketPlayers',JSON.stringify(names)); scores=Array(names.length).fill(0);toast('メンバーを保存しました')}
-$('#addPlayer').onclick=()=>{if(names.length<8){names.push(`プレイヤー${names.length+1}`);renderPlayers()}else toast('最大8人です')}; $('#savePlayers').onclick=savePlayers; renderPlayers();
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1400)}
-function show(id){$$('.screen').forEach(s=>s.classList.remove('active'));$('#'+id).classList.add('active');currentGame=id;window.scrollTo({top:0,behavior:'smooth'})}
-function scorebar(current=-1){$$('[data-scorebar]').forEach(b=>b.innerHTML=names.map((n,i)=>`<div class="score ${i===current?'current':''}">${esc(n)} · ${scores[i]||0}</div>`).join(''))}
-$$('.back').forEach(b=>b.onclick=()=>show('home')); $$('.game-card').forEach(b=>b.onclick=()=>{savePlayers();const g=b.dataset.game;show(g);if(g==='sync')startSync();if(g==='bomb')startBomb();if(g==='five')startFive()});
-
-const syncRounds=[
- {q:'休日の朝にしたいこと',a:['二度寝','散歩','カフェ','ゲーム']},{q:'無人島に1つ持っていくなら',a:['ナイフ','スマホ','水','友達']},{q:'テンションが上がる食べ物',a:['焼肉','寿司','ラーメン','ケーキ']},{q:'旅行で一番大事なのは',a:['景色','食事','ホテル','一緒に行く人']},{q:'動物になるなら',a:['猫','犬','鳥','イルカ']},{q:'急に100万円もらったら',a:['旅行','貯金','買い物','投資']},{q:'最強の夜食',a:['ラーメン','おにぎり','アイス','ポテチ']},{q:'超能力を1つ選ぶなら',a:['瞬間移動','透明化','時間停止','心を読む']}
-];
-let sync={round:null,player:0,answers:[]};
-function startSync(){scores=Array(names.length).fill(0);newSyncRound()}
-function newSyncRound(){sync={round:syncRounds[Math.floor(Math.random()*syncRounds.length)],player:0,answers:[]};renderSyncPass()}
-function renderSyncPass(){scorebar(sync.player);$('#syncStage').innerHTML=`<div class="eyebrow">SECRET CHOICE</div><div class="prompt">${esc(names[sync.player])}さんの番</div><div class="sub">他の人に画面を見せず、「回答を見る」を押してください。</div><button class="primary big-btn" id="showSync">回答を見る</button><div class="rules">同じ選択をした人数が多いほど得点。2人でも「相手を読めるか」で盛り上がります。</div>`;$('#showSync').onclick=renderSyncChoices}
-function renderSyncChoices(){const r=sync.round;$('#syncStage').innerHTML=`<div class="eyebrow">QUESTION</div><div class="prompt">${r.q}</div><div class="sub">みんなも選びそうな答えを1つ選ぶ。</div><div class="choices">${r.a.map((a,i)=>`<button class="choice" data-a="${i}">${a}</button>`).join('')}</div>`;$$('[data-a]').forEach(b=>b.onclick=()=>{sync.answers.push(+b.dataset.a);sync.player++;if(sync.player<names.length)renderSyncPass();else revealSync()})}
-function revealSync(){const counts={};sync.answers.forEach(a=>counts[a]=(counts[a]||0)+1);sync.answers.forEach((a,i)=>{if(counts[a]>=2)scores[i]+=counts[a]-1});scorebar();$('#syncStage').innerHTML=`<div class="eyebrow">REVEAL</div><div class="prompt">答え合わせ！</div><div class="reveal-list">${names.map((n,i)=>`<div class="reveal"><span>${esc(n)}</span><span>${sync.round.a[sync.answers[i]]} ${counts[sync.answers[i]]>=2?'＋'+(counts[sync.answers[i]]-1):'±0'}</span></div>`).join('')}</div><button class="primary big-btn" id="nextSync">次のお題</button>`;$('#nextSync').onclick=newSyncRound}
-
-let bomb={n:0,turn:0,over:false};
-function startBomb(){scores=Array(names.length).fill(0);bomb={n:0,turn:0,over:false};renderBomb()}
-function renderBomb(){scorebar(bomb.turn);const near=bomb.n>=17;$('#bombStage').innerHTML=`<div class="eyebrow">DON'T HIT 21</div><div class="turn-name">${esc(names[bomb.turn])} の番</div><div class="bomb-number ${near?'danger':''}">${bomb.n}</div><div class="sub" style="text-align:center">1〜3個ぶん数字を進める。21以上にした人が爆発。</div><div class="num-grid">${[1,2,3].map(v=>`<button class="num-btn" data-plus="${v}">＋${v}</button>`).join('')}</div><div class="rules">数字は全員に公開。短いのに終盤の読み合いが強いゲームです。</div>`;$$('[data-plus]').forEach(b=>b.onclick=()=>bombMove(+b.dataset.plus))}
-function bombMove(v){if(bomb.over)return;bomb.n+=v;if(bomb.n>=21){bomb.over=true;names.forEach((_,i)=>{if(i!==bomb.turn)scores[i]+=1});scorebar();$('#bombStage').innerHTML=`<div class="eyebrow">BOOM!</div><div class="prompt">💥 ${esc(names[bomb.turn])} 爆発！</div><div class="sub">ほかのプレイヤー全員に +1点。</div><button class="primary big-btn" id="bombAgain">もう一戦</button>`;$('#bombAgain').onclick=()=>{bomb={n:0,turn:(bomb.turn+1)%names.length,over:false};renderBomb()}}else{bomb.turn=(bomb.turn+1)%names.length;renderBomb()}}
-
-const challenges=['赤いものを3つ','丸いものを3つ','コンビニで買えるものを3つ','動物を3つ','国の名前を3つ','朝にすることを3つ','スマホでできることを3つ','冷たい食べ物を3つ','駅にあるものを3つ','「か」から始まる言葉を3つ','映画のジャンルを3つ','旅行に持っていくものを3つ','家にある電化製品を3つ','スポーツを3つ','飲み物を3つ','青いものを3つ'];
-let five={turn:0,prompt:'',running:false,timer:null,time:5};
-function startFive(){scores=Array(names.length).fill(0);five.turn=0;newFive()}
-function newFive(){clearInterval(five.timer);five.prompt=challenges[Math.floor(Math.random()*challenges.length)];five.running=false;five.time=5;renderFiveReady()}
-function renderFiveReady(){scorebar(five.turn);$('#fiveStage').innerHTML=`<div class="eyebrow">5 SECOND CHALLENGE</div><div class="turn-name">${esc(names[five.turn])} の挑戦</div><div class="prompt">${five.prompt}</div><div class="sub">声に出して答える準備ができたらスタート。</div><button class="primary big-btn" id="fiveStart">5秒スタート</button><div class="rules">成功判定は全員で。厳密さより、勢いを優先してください。</div>`;$('#fiveStart').onclick=startTimer}
-function startTimer(){five.running=true;five.time=5;$('#fiveStage').innerHTML=`<div class="eyebrow">GO!</div><div class="prompt">${five.prompt}</div><div class="timer running" id="timer">5.0</div><div class="sub" style="text-align:center">答えて！</div>`;const started=performance.now();five.timer=setInterval(()=>{const left=Math.max(0,5-(performance.now()-started)/1000);$('#timer').textContent=left.toFixed(1);if(left<=0){clearInterval(five.timer);renderJudge()}},50)}
-function renderJudge(){navigator.vibrate&&navigator.vibrate([80,50,80]);$('#fiveStage').innerHTML=`<div class="eyebrow">TIME UP</div><div class="prompt">できた？</div><div class="sub">みんなで判定。</div><div class="judge-grid"><button class="judge ok" id="fiveOk">成功 ＋1</button><button class="judge ng" id="fiveNg">失敗</button></div>`;$('#fiveOk').onclick=()=>finishFive(true);$('#fiveNg').onclick=()=>finishFive(false)}
-function finishFive(ok){if(ok)scores[five.turn]+=1;five.turn=(five.turn+1)%names.length;scorebar(five.turn);newFive()}
-</script>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
