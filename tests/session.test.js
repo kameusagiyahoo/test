@@ -18,9 +18,11 @@ test('party schedule selects six unique games when eight are available',()=>{
   for(const id of schedule)assert.ok(ids.includes(id));
 });
 
-test('party awards normalize distinct ranks to 3/2/1',()=>{
+test('party awards normalize positive ranks and do not reward zero scores',()=>{
   assert.deepEqual(partyAwards([7,3,1,0]),[3,2,1,0]);
-  assert.deepEqual(partyAwards([5,5,2,0]),[3,3,2,1]);
+  assert.deepEqual(partyAwards([5,5,2,0]),[3,3,2,0]);
+  assert.deepEqual(partyAwards([1,0,0]),[3,0,0]);
+  assert.deepEqual(partyAwards([0,0,0]),[0,0,0]);
 });
 
 test('score ranking sorts descending and preserves tied ranks',()=>{
@@ -39,8 +41,8 @@ test('party round transfers local result into party score then resets local scor
   assert.equal(session.party.totalRounds,6);
   session.scores=[4,2,0];
   const result=session.finishPartyRound();
-  assert.deepEqual(result.awards,[3,2,1]);
-  assert.deepEqual(session.partyScores,[3,2,1]);
+  assert.deepEqual(result.awards,[3,2,0]);
+  assert.deepEqual(session.partyScores,[3,2,0]);
   assert.deepEqual(session.scores,[0,0,0]);
   assert.equal(session.party.round,1);
 });
