@@ -16,7 +16,7 @@ const toastEl=document.querySelector('#toast');
 let draftPlayers=[...session.players];
 let activeCleanup=null;
 
-const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1400)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
