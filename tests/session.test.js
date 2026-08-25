@@ -1,13 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SessionStore,buildBalancedSchedule,partyAwards,normalizeAnswer} from '../src/core/session.js';
+import {SessionStore,buildBalancedSchedule,buildPartySchedule,partyAwards,normalizeAnswer} from '../src/core/session.js';
 
 function memoryStorage(){const data=new Map();return{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,String(v))}}
 
-test('balanced schedule contains every game exactly twice',()=>{
+test('balanced schedule still contains every game exactly twice',()=>{
   const schedule=buildBalancedSchedule(['sync','bomb','five'],2,()=>0.42);
   assert.equal(schedule.length,6);
   for(const id of ['sync','bomb','five'])assert.equal(schedule.filter(x=>x===id).length,2);
+});
+
+test('party schedule selects six unique games when eight are available',()=>{
+  const ids=['sync','bomb','five','minority','sniper','taboo','clock','ten'];
+  const schedule=buildPartySchedule(ids,6,()=>0.42);
+  assert.equal(schedule.length,6);
+  assert.equal(new Set(schedule).size,6);
+  for(const id of schedule)assert.ok(ids.includes(id));
 });
 
 test('party awards normalize distinct ranks to 3/2/1',()=>{
@@ -18,7 +26,8 @@ test('party awards normalize distinct ranks to 3/2/1',()=>{
 test('party round transfers local result into party score then resets local score',()=>{
   const session=new SessionStore({storage:memoryStorage()});
   session.savePlayers(['A','B','C']);
-  session.startParty(['sync','bomb','five'],2,()=>0.3);
+  session.startParty(['sync','bomb','five','minority','sniper','taboo','clock','ten'],6,()=>0.3);
+  assert.equal(session.party.totalRounds,6);
   session.scores=[4,2,0];
   const result=session.finishPartyRound();
   assert.deepEqual(result.awards,[3,2,1]);
