@@ -1,4 +1,4 @@
-import {SessionStore} from './core/session.js';
+import {SessionStore,rankScores} from './core/session.js';
 import {createLocalTransport} from './core/transport.js';
 import {registerGame,getGame,listGames} from './core/registry.js';
 import {syncGame} from './games/sync.js';
@@ -20,11 +20,13 @@ const homeButton=document.querySelector('#homeButton');
 const toastEl=document.querySelector('#toast');
 let draftPlayers=[...session.players];
 let activeCleanup=null;
+let lastSingleGameId=null;
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
+function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
 
 homeButton.onclick=()=>{disposeActiveGame();renderHome()};
 
@@ -71,6 +73,7 @@ function startGame(id){
   disposeActiveGame();
   const game=getGame(id);
   if(!game)return renderHome();
+  if(session.mode==='single')lastSingleGameId=id;
   updateBadge(session.mode==='party'?`Party ${session.party.round+1}/${session.party.totalRounds}`:'先に5点');
   app.innerHTML=`<div class="game-top"><button class="btn back" id="backButton">←</button><div><div class="eyebrow">${session.mode==='party'?'PARTY ROUND':'SINGLE GAME'}</div><div style="font-size:24px;font-weight:950">${game.emoji} ${game.title}</div></div></div><div class="scorebar" data-scorebar></div><section class="stage" id="gameStage"></section>`;
   app.querySelector('#backButton').onclick=renderHome;
@@ -97,7 +100,7 @@ function renderPartyIntermission(first=false,result=null){
   const progress=session.party.round/session.party.totalRounds*100;
   updateBadge(`Party ${session.party.round+1}/${session.party.totalRounds}`);
   const awardHtml=result?`<div class="card" style="margin-bottom:14px"><div class="eyebrow">ROUND RESULT</div><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>＋${result.awards[i]} Party pt</span></div>`).join('')}</div></div>`:'';
-  app.innerHTML=`<section class="panel"><div class="eyebrow">PARTY MODE</div><div class="prompt">${first?'8ゲームから6つを抽選':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${awardHtml}<div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${i+1}. ${esc(name)}</span><span>${session.partyScores[i]} Party pt</span></div>`).join('')}</div><div style="margin-top:20px" class="card"><div style="font-size:36px">${game.emoji}</div><h3 style="font-size:24px;margin:8px 0">Round ${session.party.round+1}: ${game.title}</h3><p class="muted">${game.description}</p></div><button class="btn primary" style="width:100%;margin-top:18px" id="partyNext">${first?'Party Modeを開始':'次のゲームへ'}</button></section>`;
+  app.innerHTML=`<section class="panel"><div class="eyebrow">PARTY MODE</div><div class="prompt">${first?'8ゲームから6つを抽選':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${awardHtml}<div class="result-list">${rankingHtml(session.partyScores,'Party pt')}</div><div style="margin-top:20px" class="card"><div style="font-size:36px">${game.emoji}</div><h3 style="font-size:24px;margin:8px 0">Round ${session.party.round+1}: ${game.title}</h3><p class="muted">${game.description}</p></div><button class="btn primary" style="width:100%;margin-top:18px" id="partyNext">${first?'Party Modeを開始':'次のゲームへ'}</button></section>`;
   app.querySelector('#partyNext').onclick=()=>startGame(nextId);
 }
 
@@ -106,9 +109,13 @@ function renderWinner(isParty){
   const winners=session.winnerIndexes(isParty);
   const scores=isParty?session.partyScores:session.scores;
   updateBadge('RESULT');
-  app.innerHTML=`<section class="panel winner"><div class="trophy">🏆</div><div class="eyebrow">${isParty?'PARTY CHAMPION':'WINNER'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点優勝！':'優勝！'}</p><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>${scores[i]} ${isParty?'Party pt':'pt'}</span></div>`).join('')}</div><div class="actions"><button class="btn" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
+  app.innerHTML=`<section class="panel winner"><div class="trophy">🏆</div><div class="eyebrow">${isParty?'PARTY CHAMPION':'WINNER'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点優勝！':'優勝！'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div><div class="actions"><button class="btn" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
   app.querySelector('#homeResult').onclick=renderHome;
-  app.querySelector('#againResult').onclick=()=>{if(isParty){session.startParty(listGames().map(g=>g.id),6);renderPartyIntermission(true)}else renderHome()};
+  app.querySelector('#againResult').onclick=()=>{
+    if(isParty){session.startParty(listGames().map(g=>g.id),6);return renderPartyIntermission(true)}
+    if(lastSingleGameId){session.startSingle();return startGame(lastSingleGameId)}
+    renderHome();
+  };
 }
 
 renderHome();
