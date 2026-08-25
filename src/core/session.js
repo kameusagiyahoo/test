@@ -1,7 +1,14 @@
 const PLAYER_KEY='partyPocketPlayersV3';
+const LEGACY_PLAYER_KEYS=['partyPocketPlayersV2','partyPocketPlayers'];
 
 function safePlayers(storage){
-  try{return JSON.parse(storage?.getItem(PLAYER_KEY)||'null')||['プレイヤー1','プレイヤー2']}catch{return ['プレイヤー1','プレイヤー2']}
+  try{
+    for(const key of [PLAYER_KEY,...LEGACY_PLAYER_KEYS]){
+      const value=storage?.getItem?.(key);
+      if(value){const parsed=JSON.parse(value);if(Array.isArray(parsed)&&parsed.length>=2)return parsed}
+    }
+  }catch{}
+  return ['プレイヤー1','プレイヤー2'];
 }
 
 export function buildBalancedSchedule(gameIds,repeats=2,rng=Math.random){
