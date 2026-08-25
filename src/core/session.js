@@ -11,11 +11,25 @@ function safePlayers(storage){
   return ['プレイヤー1','プレイヤー2'];
 }
 
-export function buildBalancedSchedule(gameIds,repeats=2,rng=Math.random){
+function shuffled(values,rng=Math.random){
+  const result=[...values];
+  for(let i=result.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[result[i],result[j]]=[result[j],result[i]]}
+  return result;
+}
+
+export function buildPartySchedule(gameIds,totalRounds=6,rng=Math.random){
+  if(!gameIds.length||totalRounds<=0)return [];
   const schedule=[];
-  for(let r=0;r<repeats;r++)schedule.push(...gameIds);
-  for(let i=schedule.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[schedule[i],schedule[j]]=[schedule[j],schedule[i]]}
+  while(schedule.length<totalRounds){
+    const pool=shuffled(gameIds,rng);
+    if(schedule.length&&pool.length>1&&pool[0]===schedule.at(-1)) [pool[0],pool[1]]=[pool[1],pool[0]];
+    schedule.push(...pool.slice(0,totalRounds-schedule.length));
+  }
   return schedule;
+}
+
+export function buildBalancedSchedule(gameIds,repeats=2,rng=Math.random){
+  return buildPartySchedule(gameIds,gameIds.length*repeats,rng);
 }
 
 export function partyAwards(scores){
@@ -43,9 +57,9 @@ export class SessionStore{
   resetScores(){this.scores=Array(this.players.length).fill(0)}
   addScore(index,points=1){this.scores[index]=(this.scores[index]||0)+points;this.emit()}
   startSingle(){this.mode='single';this.party.active=false;this.resetScores();this.emit()}
-  startParty(gameIds,repeats=2,rng=Math.random){
+  startParty(gameIds,totalRounds=6,rng=Math.random){
     this.mode='party';this.resetScores();this.partyScores=Array(this.players.length).fill(0);
-    const schedule=buildBalancedSchedule(gameIds,repeats,rng);
+    const schedule=buildPartySchedule(gameIds,totalRounds,rng);
     this.party={round:0,totalRounds:schedule.length,schedule,active:true,lastAward:null};this.emit();
   }
   currentPartyGame(){return this.party.schedule[this.party.round]}

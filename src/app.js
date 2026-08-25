@@ -4,10 +4,13 @@ import {registerGame,getGame,listGames} from './core/registry.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
+import {minorityGame} from './games/minority.js';
+import {sniperGame} from './games/sniper.js';
+import {tabooGame} from './games/taboo.js';
+import {clockGame} from './games/clock.js';
+import {tenGame} from './games/ten.js';
 
-registerGame(syncGame);
-registerGame(bombGame);
-registerGame(fiveGame);
+[syncGame,bombGame,fiveGame,minorityGame,sniperGame,tabooGame,clockGame,tenGame].forEach(registerGame);
 
 const transport=createLocalTransport();
 const session=new SessionStore({transport});
@@ -48,15 +51,15 @@ function renderHome(){
   <div class="section-head"><h2>プレイヤー</h2><span class="muted">端末に保存</span></div>
   <section class="panel"><div id="playerList" class="stack"></div><div class="actions"><button class="btn" id="addPlayer">＋ 追加</button><button class="btn primary" id="savePlayers">保存</button></div></section>
   <div class="section-head"><h2>遊び方</h2><span class="muted">おすすめ: Party Mode</span></div>
-  <section class="mode-grid"><button class="game-card" id="partyMode" style="background:#fff0bd"><div class="chip">6 ROUNDS</div><h3>🏆 Party Mode</h3><p>3ゲームを各2回。ラウンド順位をParty Pointへ変換して総合優勝を決める。</p></button><div class="card" style="padding:18px"><div class="chip">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p class="muted">好きなゲームを選び、先に5点取った人が勝利。</p></div></section>
-  <div class="section-head"><h2>ゲーム</h2><span class="muted">スマホ1台</span></div>
+  <section class="mode-grid"><button class="game-card" id="partyMode" style="background:#fff0bd"><div class="chip">6 ROUNDS</div><h3>🏆 Party Mode</h3><p>${listGames().length}ゲームから毎回6つを抽選。ラウンド順位をParty Pointへ変換して総合優勝を決める。</p></button><div class="card" style="padding:18px"><div class="chip">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p class="muted">好きなゲームを選び、先に5点取った人が勝利。</p></div></section>
+  <div class="section-head"><h2>ゲーム</h2><span class="muted">${listGames().length} games · スマホ1台</span></div>
   <section class="games">${listGames().map(g=>`<button class="game-card" data-game="${g.id}"><div style="font-size:32px">${g.emoji}</div><h3>${g.title}</h3><p>${g.description}</p><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">${g.tags.map(t=>`<span class="chip">${t}</span>`).join('')}</div></button>`).join('')}</section>
   <div class="footer">Party Pocket · GitHub Pages only</div>`;
 
   renderPlayers();
   app.querySelector('#addPlayer').onclick=()=>{if(draftPlayers.length>=8)return toast('最大8人です');draftPlayers.push(`プレイヤー${draftPlayers.length+1}`);renderPlayers()};
   app.querySelector('#savePlayers').onclick=saveDraft;
-  app.querySelector('#partyMode').onclick=()=>{saveDraft();session.startParty(listGames().map(g=>g.id),2);renderPartyIntermission(true)};
+  app.querySelector('#partyMode').onclick=()=>{saveDraft();session.startParty(listGames().map(g=>g.id),6);renderPartyIntermission(true)};
   app.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>{saveDraft();session.startSingle();startGame(button.dataset.game)});
 }
 
@@ -94,7 +97,7 @@ function renderPartyIntermission(first=false,result=null){
   const progress=session.party.round/session.party.totalRounds*100;
   updateBadge(`Party ${session.party.round+1}/${session.party.totalRounds}`);
   const awardHtml=result?`<div class="card" style="margin-bottom:14px"><div class="eyebrow">ROUND RESULT</div><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>＋${result.awards[i]} Party pt</span></div>`).join('')}</div></div>`:'';
-  app.innerHTML=`<section class="panel"><div class="eyebrow">PARTY MODE</div><div class="prompt">${first?'各ゲーム2回ずつの総合戦':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${awardHtml}<div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${i+1}. ${esc(name)}</span><span>${session.partyScores[i]} Party pt</span></div>`).join('')}</div><div style="margin-top:20px" class="card"><div style="font-size:36px">${game.emoji}</div><h3 style="font-size:24px;margin:8px 0">Round ${session.party.round+1}: ${game.title}</h3><p class="muted">${game.description}</p></div><button class="btn primary" style="width:100%;margin-top:18px" id="partyNext">${first?'Party Modeを開始':'次のゲームへ'}</button></section>`;
+  app.innerHTML=`<section class="panel"><div class="eyebrow">PARTY MODE</div><div class="prompt">${first?'8ゲームから6つを抽選':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${awardHtml}<div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${i+1}. ${esc(name)}</span><span>${session.partyScores[i]} Party pt</span></div>`).join('')}</div><div style="margin-top:20px" class="card"><div style="font-size:36px">${game.emoji}</div><h3 style="font-size:24px;margin:8px 0">Round ${session.party.round+1}: ${game.title}</h3><p class="muted">${game.description}</p></div><button class="btn primary" style="width:100%;margin-top:18px" id="partyNext">${first?'Party Modeを開始':'次のゲームへ'}</button></section>`;
   app.querySelector('#partyNext').onclick=()=>startGame(nextId);
 }
 
@@ -105,7 +108,7 @@ function renderWinner(isParty){
   updateBadge('RESULT');
   app.innerHTML=`<section class="panel winner"><div class="trophy">🏆</div><div class="eyebrow">${isParty?'PARTY CHAMPION':'WINNER'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点優勝！':'優勝！'}</p><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>${scores[i]} ${isParty?'Party pt':'pt'}</span></div>`).join('')}</div><div class="actions"><button class="btn" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
   app.querySelector('#homeResult').onclick=renderHome;
-  app.querySelector('#againResult').onclick=()=>{if(isParty){session.startParty(listGames().map(g=>g.id),2);renderPartyIntermission(true)}else renderHome()};
+  app.querySelector('#againResult').onclick=()=>{if(isParty){session.startParty(listGames().map(g=>g.id),6);renderPartyIntermission(true)}else renderHome()};
 }
 
 renderHome();
