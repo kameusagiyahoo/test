@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {SessionStore,buildBalancedSchedule,partyAwards,normalizeAnswer} from '../src/core/session.js';
+
+function memoryStorage(){const data=new Map();return{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,String(v))}}
+
+test('balanced schedule contains every game exactly twice',()=>{
+  const schedule=buildBalancedSchedule(['sync','bomb','five'],2,()=>0.42);
+  assert.equal(schedule.length,6);
+  for(const id of ['sync','bomb','five'])assert.equal(schedule.filter(x=>x===id).length,2);
+});
+
+test('party awards normalize distinct ranks to 3/2/1',()=>{
+  assert.deepEqual(partyAwards([7,3,1,0]),[3,2,1,0]);
+  assert.deepEqual(partyAwards([5,5,2,0]),[3,3,2,1]);
+});
+
+test('party round transfers local result into party score then resets local score',()=>{
+  const session=new SessionStore({storage:memoryStorage()});
+  session.savePlayers(['A','B','C']);
+  session.startParty(['sync','bomb','five'],2,()=>0.3);
+  session.scores=[4,2,0];
+  const result=session.finishPartyRound();
+  assert.deepEqual(result.awards,[3,2,1]);
+  assert.deepEqual(session.partyScores,[3,2,1]);
+  assert.deepEqual(session.scores,[0,0,0]);
+  assert.equal(session.party.round,1);
+});
+
+test('answer normalization handles width, case and punctuation',()=>{
+  assert.equal(normalizeAnswer(' Ａpple！ '),normalizeAnswer('apple'));
+  assert.equal(normalizeAnswer('リンゴ。'),normalizeAnswer('リンゴ'));
+});

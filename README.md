@@ -1,30 +1,51 @@
-# Party Pocket v2
+# Party Pocket v3
 
-2〜8人でスマホ1台を回して遊ぶ、モジュール式パーティーゲーム基盤です。
-
-## Game platform
-
-- `src/core/session.js` — プレイヤー、総合スコア、Single / Party Mode、ラウンド進行
-- `src/core/registry.js` — ゲームモジュール登録
-- `src/games/*.js` — 各ゲームの独立モジュール
-- `src/app.js` — ホーム、ゲーム起動、勝敗、Party Mode制御
-
-新しいゲームは `id / title / emoji / description / tags / mount(ctx)` を持つモジュールとして追加し、registry に登録します。
+2〜8人で遊べる、モジュール式パーティーゲーム基盤です。現在はスマホ1台を回すローカルモードを実装済みで、複数スマホ対応に向けたTransport層も追加しています。
 
 ## Games
 
-### シンクロ
-4択と自由回答をランダムに使用。全員が秘密に回答し、同じ回答の人数に応じて得点します。
+- 🎯 シンクロ — 4択 / 自由回答の一致ゲーム
+- 💣 21ボム+ — ランダム爆発位置 + PASS
+- ⚡️ 5秒チャレンジ+ — EASY / NORMAL / HARD
 
-### 21ボム+
-爆発数字は18〜30、1ターンに進める数は2〜4の範囲で毎戦変化。各プレイヤーは1戦に1回だけPASSできます。
+## Party Mode
 
-### 5秒チャレンジ+
-EASY / NORMAL / HARD。全員が1回ずつ挑戦して1セットとなり、難易度ごとに制限時間と問題プールが変わります。
+3ゲームを各2回ずつ、合計6ラウンド。各ゲーム内の生スコアはラウンド終了時に順位化し、Party Pointへ変換します。
 
-## Modes
+- 1位グループ: +3 Party pt
+- 2位グループ: +2 Party pt
+- 3位グループ: +1 Party pt
+- それ以下: +0
 
-- Single Game: 先に5点で勝利
-- Party Mode: 5ラウンドで3ゲームを巡回し、総合得点で優勝を決定
+同点は同じParty Pointを獲得します。
 
-GitHub Pagesでビルドなしに動作します。
+## Architecture
+
+```text
+src/
+├ core/
+│  ├ session.js       # player / local score / party score / schedule
+│  ├ registry.js      # game registry
+│  └ transport.js     # local/remote transport abstraction
+├ games/
+│  ├ sync.js
+│  ├ bomb.js
+│  └ five.js
+└ app.js
+```
+
+各ゲームの `mount(ctx)` は終了時cleanup関数を返せます。画面離脱時にタイマー等を破棄するためのGame Lifecycleとして使用します。
+
+## Tests
+
+```bash
+npm test
+```
+
+GitHub ActionsでもPR / main push時にNode.jsテストを実行します。
+
+## Multi-device
+
+次段階では Cloudflare Workers + Durable Objects + WebSocket を使い、ルームコードで複数端末が参加できる構成にします。設計方針は `docs/MULTI_DEVICE.md` を参照してください。
+
+GitHub Pages側は引き続きビルド不要のNative ES Modulesで動作します。
