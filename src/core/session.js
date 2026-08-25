@@ -33,9 +33,19 @@ export function buildBalancedSchedule(gameIds,repeats=2,rng=Math.random){
 }
 
 export function partyAwards(scores){
-  const distinct=[...new Set(scores)].sort((a,b)=>b-a);
+  const distinct=[...new Set(scores.filter(score=>score>0))].sort((a,b)=>b-a);
   const points=[3,2,1];
-  return scores.map(score=>points[distinct.indexOf(score)]||0);
+  return scores.map(score=>score>0?(points[distinct.indexOf(score)]||0):0);
+}
+
+export function rankScores(scores){
+  const ordered=scores.map((score,index)=>({index,score})).sort((a,b)=>b.score-a.score||a.index-b.index);
+  let previousScore=null,previousRank=0;
+  return ordered.map((row,pos)=>{
+    const rank=pos===0||row.score!==previousScore?pos+1:previousRank;
+    previousScore=row.score;previousRank=rank;
+    return{...row,rank};
+  });
 }
 
 export class SessionStore{
