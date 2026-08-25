@@ -15,12 +15,17 @@ function turn(ctx,state,life){
   const button=ctx.root.querySelector('#reveal');button.onpointerdown=()=>life.hold=setTimeout(()=>show(ctx,state,life),350);button.onpointerup=button.onpointerleave=()=>clearTimeout(life.hold);
 }
 function show(ctx,state,life){
-  const [word,ng]=state.card;
-  ctx.root.innerHTML=`<div class="eyebrow">TABOO</div><div class="prompt">${ctx.esc(word)}</div><div class="sub">この3語は禁止</div><div class="choice-grid">${ng.map(x=>`<div class="choice" style="pointer-events:none">🚫 ${ctx.esc(x)}</div>`).join('')}</div><div class="rules">画面を伏せて説明開始。誰かが正解したら「成功」を押してください。</div><div class="choice-grid"><button class="btn green" id="ok">成功 +1</button><button class="btn pink" id="ng">失敗</button></div>`;
+  if(life.destroyed)return;const [word,ng]=state.card;
+  ctx.root.innerHTML=`<div class="eyebrow">TABOO</div><div class="prompt">${ctx.esc(word)}</div><div class="sub">この3語は禁止</div><div class="choice-grid">${ng.map(x=>`<div class="choice" style="pointer-events:none">🚫 ${ctx.esc(x)}</div>`).join('')}</div><div class="rules">内容を覚えたら「説明開始」。次の画面ではお題とNGワードを隠します。</div><button class="btn primary" style="width:100%;margin-top:18px" id="startExplain">覚えた・説明開始</button>`;
+  ctx.root.querySelector('#startExplain').onclick=()=>judge(ctx,state,life);
+}
+function judge(ctx,state,life){
+  if(life.destroyed)return;const name=ctx.session.players[state.player];
+  ctx.root.innerHTML=`<div class="eyebrow">EXPLAIN</div><div class="prompt">${ctx.esc(name)}さん、説明中！</div><div class="big-number">🙊</div><div class="sub" style="text-align:center">お題とNGワードは非表示です。</div><div class="choice-grid"><button class="btn green" id="ok">成功 +1</button><button class="btn pink" id="ng">失敗</button></div>`;
   ctx.root.querySelector('#ok').onclick=()=>finishTurn(ctx,state,true,life);ctx.root.querySelector('#ng').onclick=()=>finishTurn(ctx,state,false,life);
 }
 function finishTurn(ctx,state,success,life){
-  if(success)ctx.session.addScore(state.player,1);state.results.push(success);state.player++;
+  if(life.destroyed)return;if(success)ctx.session.addScore(state.player,1);state.results.push(success);state.player++;
   if(state.player<ctx.session.players.length)return turn(ctx,state,life);
   ctx.renderScorebar();ctx.root.innerHTML=`<div class="eyebrow">ROUND RESULT</div><div class="prompt">説明チャレンジ終了</div><div class="result-list">${ctx.session.players.map((n,i)=>`<div class="result-row"><span>${ctx.esc(n)}</span><span>${state.results[i]?'成功 ＋1':'失敗 ±0'}</span></div>`).join('')}</div><button class="btn primary" style="width:100%;margin-top:18px" id="next">次へ</button>`;
   ctx.root.querySelector('#next').onclick=()=>ctx.completeRound(()=>start(ctx,life));
