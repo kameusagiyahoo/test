@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChatGPT × GitHub Test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #eef2ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(99,102,241,.32), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(16,185,129,.20), transparent 32%),
+        #0b1020;
+    }
+    main {
+      width: min(760px, 100%);
+      padding: 40px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 24px;
+      background: rgba(15,23,42,.78);
+      box-shadow: 0 24px 80px rgba(0,0,0,.35);
+      backdrop-filter: blur(18px);
+    }
+    .badge {
+      display: inline-flex;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(99,102,241,.16);
+      border: 1px solid rgba(129,140,248,.35);
+      color: #c7d2fe;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    h1 {
+      margin: 20px 0 12px;
+      font-size: clamp(38px, 8vw, 72px);
+      line-height: .98;
+      letter-spacing: -.05em;
+    }
+    p {
+      margin: 0;
+      color: #aab4cc;
+      font-size: 18px;
+      line-height: 1.7;
+    }
+    .status {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .card {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .card strong { display: block; margin-bottom: 4px; }
+    .card span { color: #8590a8; font-size: 13px; }
+    button {
+      margin-top: 28px;
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 18px;
+      font: inherit;
+      font-weight: 800;
+      color: #0b1020;
+      background: #a5b4fc;
+      cursor: pointer;
+    }
+    #message { margin-top: 14px; font-size: 14px; color: #86efac; }
+    @media (max-width: 620px) {
+      main { padding: 28px; }
+      .status { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="badge">CHATGPT × GITHUB</div>
+    <h1>It works.</h1>
+    <p>
+      このページは、ChatGPT の通常チャットから GitHub リポジトリへ直接ファイルを作成し、
+      commit / branch / Pull Request / merge まで行えるかを確認するためのテストページです。
+    </p>
+
+    <section class="status">
+      <div class="card"><strong>GitHub</strong><span>Repository connected</span></div>
+      <div class="card"><strong>Pages</strong><span>Static site ready</span></div>
+      <div class="card"><strong>ChatGPT</strong><span>Development interface</span></div>
+    </section>
+
+    <button id="testButton" type="button">動作テスト</button>
+    <div id="message" aria-live="polite"></div>
+  </main>
+
+  <script>
+    const button = document.getElementById('testButton');
+    const message = document.getElementById('message');
+
+    button.addEventListener('click', () => {
+      const now = new Date().toLocaleString('ja-JP');
+      message.textContent = `JavaScript も正常に動作しています。 ${now}`;
+    });
+  </script>
+</body>
+</html>
