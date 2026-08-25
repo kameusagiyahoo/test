@@ -81,6 +81,13 @@
       cursor: pointer;
     }
     #message { margin-top: 14px; font-size: 14px; color: #86efac; }
+    footer {
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      color: #718096;
+      font-size: 13px;
+    }
     @media (max-width: 620px) {
       main { padding: 28px; }
       .status { grid-template-columns: 1fr; }
@@ -92,8 +99,8 @@
     <div class="badge">CHATGPT × GITHUB</div>
     <h1>It works.</h1>
     <p>
-      このページは、ChatGPT の通常チャットから GitHub リポジトリへ直接ファイルを作成し、
-      commit / branch / Pull Request / merge まで行えるかを確認するためのテストページです。
+      このページは、ChatGPT の通常チャットから GitHub リポジトリへ直接変更を加え、
+      commit / branch / Pull Request / merge まで進められることを確認するデモです。
     </p>
 
     <section class="status">
@@ -104,6 +111,8 @@
 
     <button id="testButton" type="button">動作テスト</button>
     <div id="message" aria-live="polite"></div>
+
+    <footer>feature/chatgpt-pages-demo branch から PR 経由で公開</footer>
   </main>
 
   <script>
