@@ -1,51 +1,55 @@
-# Party Pocket v4
+# Party Pocket
 
-2〜8人向けのモジュール式パーティーゲーム基盤です。
+GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲーム集です。
+
+## 方針
+
+- 公開先: GitHub Pagesのみ
+- バックエンド: なし
+- 外部DB / Worker / WebSocket: なし
+- 複数端末同期: なし
+- プレイヤー名のみlocalStorageへ保存
+- スマホ1台を順番に回して遊ぶ
+
+## Games
+
+- 🎯 シンクロ — 4択 / 自由回答の一致ゲーム
+- 💣 21ボム+ — ランダム爆発位置 + PASS
+- ⚡ 5秒チャレンジ+ — EASY / NORMAL / HARD
 
 ## Modes
 
-### Local Play
-スマホ1台を回して遊ぶモード。既存の3ゲームをSingle / 6-round Party Modeで遊べます。
+### Single Game
+好きな1ゲームを選び、先に5点取った人が勝利。
 
-### Online β
-複数のスマホから同じルームへ参加するリアルタイムモードです。
+### Party Mode
+3ゲームを各2回、合計6ラウンド遊びます。各ゲーム内の生スコアはラウンド終了時に順位化し、Party Pointへ変換します。
 
-- ホストがルームを作成
-- 6文字のルームコードを発行
-- 共有リンクから別端末が参加
-- WebSocketでリアルタイム同期
-- Durable Objectがゲーム状態と得点の唯一の権威
-- 秘密回答はリビールまで本人以外へ配信しない
-- 切断時はクライアントが自動再接続
+- 1位グループ: +3 Party pt
+- 2位グループ: +2 Party pt
+- 3位グループ: +1 Party pt
+- それ以下: +0
 
-## Online games
-
-- 🎯 シンクロ — 各端末から秘密回答
-- 💣 21ボム+ — ターンを全端末へ同期
-- ⚡ 5秒チャレンジ+ — 挑戦者・サーバー時刻・ホスト判定を同期
-
-Online Partyは `sync → bomb → five → sync → bomb → five` の6ラウンドです。各ラウンドの生スコアを 3 / 2 / 1 / 0 Party Pointへ正規化します。
+同点は同じParty Pointを獲得します。
 
 ## Architecture
 
 ```text
-GitHub Pages client
-  ├ src/app.js
-  ├ src/remote.js
-  ├ src/core/room-transport.js
-  └ local game modules
-          │
-          │ HTTPS / WebSocket
-          ▼
-Cloudflare Worker
-          │
-          ▼
-Durable Object (one object per room)
-  ├ player/session tokens
-  ├ authoritative room state
-  ├ game state
-  └ WebSocket fan-out
+index.html
+styles.css
+src/
+├ app.js
+├ core/
+│  ├ session.js
+│  ├ registry.js
+│  └ transport.js
+└ games/
+   ├ sync.js
+   ├ bomb.js
+   └ five.js
 ```
+
+`transport.js` はローカルイベント用の小さな抽象層だけを残しています。外部通信は行いません。
 
 ## Tests
 
@@ -53,14 +57,8 @@ Durable Object (one object per room)
 npm test
 ```
 
-GitHub Actions runs tests and syntax checks for every PR and push to `main`.
+GitHub ActionsでPR / `main` push時にテストと主要JavaScriptの構文チェックを実行します。
 
-## Deploy the room server
+## Deploy
 
-```bash
-npm run worker:deploy
-```
-
-After deploying, open Party Pocket → `Online β` and paste the resulting `https://...workers.dev` URL once. The URL is stored on that device and is automatically included in invitation links.
-
-Detailed setup: `worker/README.md` and `docs/MULTI_DEVICE.md`.
+`main` にマージすると既存のGitHub Pagesへ反映されます。

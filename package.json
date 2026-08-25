@@ -1,12 +1,10 @@
 {
   "name": "party-pocket",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test && npm run check",
-    "check": "node --check src/app.js && node --check src/remote.js && node --check src/core/room-transport.js && node --check worker/src/engine.js && node --check worker/src/index.js",
-    "worker:dev": "npx wrangler dev --config worker/wrangler.jsonc",
-    "worker:deploy": "npx wrangler deploy --config worker/wrangler.jsonc"
+    "test": "node --test tests && npm run check",
+    "check": "node --check src/app.js && node --check src/core/session.js && node --check src/core/registry.js && node --check src/core/transport.js && node --check src/games/sync.js && node --check src/games/bomb.js && node --check src/games/five.js"
   }
 }
