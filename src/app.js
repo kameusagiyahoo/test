@@ -10,8 +10,12 @@ import {sniperGame} from './games/sniper.js';
 import {tabooGame} from './games/taboo.js';
 import {clockGame} from './games/clock.js';
 import {tenGame} from './games/ten.js';
+import {codeGame} from './games/code.js';
+import {logicGame} from './games/logic.js';
+import {evGame} from './games/ev.js';
+import {auctionGame} from './games/auction.js';
 
-[syncGame,bombGame,fiveGame,minorityGame,sniperGame,tabooGame,clockGame,tenGame].forEach(registerGame);
+[syncGame,bombGame,fiveGame,minorityGame,sniperGame,tabooGame,clockGame,tenGame,codeGame,logicGame,evGame,auctionGame].forEach(registerGame);
 
 const transport=createLocalTransport();
 const session=new SessionStore({transport});
@@ -83,12 +87,19 @@ function renderHome(){
 function renderPartySetup(){
   disposeActiveGame();const games=listGames(),ids=games.map(g=>g.id),saved=partySettings.load(ids);
   const state={rounds:saved.rounds,selected:new Set(saved.gameIds)};
-  const presets={all:ids,read:['sync','minority','sniper','bomb'],talk:['taboo','sync','five','minority'],quick:['five','clock','ten','bomb']};
+  const presets={
+    all:ids,
+    brain:['code','logic','ev','auction','sniper'],
+    strategy:['auction','ev','sniper','bomb','ten'],
+    read:['sync','minority','sniper','bomb','auction'],
+    talk:['taboo','sync','five','minority'],
+    quick:['five','clock','ten','bomb']
+  };
   function paint(){
     updateBadge('PARTY SETUP');
     app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="setupBack">←</button><div><div class="eyebrow">PARTY SETUP</div><div class="screen-title">総合戦を組む</div></div></div>
     <section class="panel setup-section"><div class="setup-label">ラウンド数</div><div class="segmented">${[3,6,9].map(n=>`<button class="segment ${state.rounds===n?'active':''}" data-rounds="${n}">${n}</button>`).join('')}</div><p class="helper">短く試すなら3、標準は6、しっかり遊ぶなら9。</p></section>
-    <section class="panel setup-section"><div class="setup-label">プリセット</div><div class="preset-row"><button class="preset-btn" data-preset="all">バランス</button><button class="preset-btn" data-preset="read">読み合い</button><button class="preset-btn" data-preset="talk">会話中心</button><button class="preset-btn" data-preset="quick">短時間</button></div></section>
+    <section class="panel setup-section"><div class="setup-label">プリセット</div><div class="preset-row"><button class="preset-btn" data-preset="all">バランス</button><button class="preset-btn" data-preset="brain">頭脳戦</button><button class="preset-btn" data-preset="strategy">戦略</button><button class="preset-btn" data-preset="read">読み合い</button><button class="preset-btn" data-preset="talk">会話中心</button><button class="preset-btn" data-preset="quick">短時間</button></div></section>
     <section class="panel setup-section"><div class="setup-head"><div class="setup-label">ゲーム選択</div><span>${state.selected.size}/${games.length}</span></div><div class="select-games">${games.map((g,i)=>`<button class="select-game ${state.selected.has(g.id)?'selected':''}" data-select-game="${g.id}" aria-pressed="${state.selected.has(g.id)}"><span class="game-index">${String(i+1).padStart(2,'0')}</span><span class="select-title">${g.title}</span><span class="select-check">${state.selected.has(g.id)?'選択中':'除外'}</span></button>`).join('')}</div><p class="helper">2ゲーム以上を選択してください。ゲーム数よりラウンド数が多い場合は重複して登場します。</p></section>
     <button class="btn primary full" id="startParty">${state.rounds}ラウンドで開始</button>`;
     app.querySelector('#setupBack').onclick=renderHome;
