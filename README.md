@@ -8,11 +8,12 @@ GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲ�
 - バックエンド: なし
 - 外部DB / Worker / WebSocket: なし
 - 複数端末同期: なし
-- プレイヤー名のみlocalStorageへ保存
+- プレイヤー名・Party設定・評価・Party途中状態をlocalStorageへ保存
 - スマホ1台を順番に回して遊ぶ
 
 ## Games
 
+### Light / Social
 - 🎯 シンクロ — 4択 / 自由回答の一致ゲーム
 - 💣 21ボム+ — ランダム爆発位置 + PASS
 - ⚡ 5秒チャレンジ+ — EASY / NORMAL / HARD
@@ -22,22 +23,34 @@ GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲ�
 - ⏱️ 体内時計 — 表示なしで指定秒数を当てる
 - 🃏 ギリギリ10 — 1〜5を引いて10を超えないギリギリを狙う
 
+### Brain / Strategy
+- ⌗ コードブレイカー — 位置一致 / 数字一致のヒントから3桁コードを推理
+- ◇ 矛盾探し — 嘘が1つだけの3証言から犯人と嘘つきを特定
+- ± 期待値チキンレース — 確率と損益から3回の投資判断
+- ⌁ 数字オークション — 18点の予算を3回の秘密入札へ配分
+
 ## Modes
 
 ### Single Game
-
 好きな1ゲームを選び、先に5点取った人が勝利。
 
 ### Party Mode
+3 / 6 / 9ラウンドを選択し、使用ゲームも自由に選べます。
 
-8ゲームから毎回6ゲームを抽選して遊びます。ゲーム内の生スコアは各ラウンド終了時に順位化し、Party Pointへ変換します。
+プリセット:
+- バランス
+- 頭脳戦
+- 戦略
+- 読み合い
+- 会話中心
+- 短時間
+
+ゲーム内の生スコアは各ラウンド終了時に順位化し、Party Pointへ変換します。
 
 - 1位グループ: +3 Party pt
 - 2位グループ: +2 Party pt
 - 3位グループ: +1 Party pt
-- それ以下: +0
-
-同点は同じParty Pointを獲得します。
+- 0点 / それ以下: +0
 
 ## Architecture
 
@@ -48,6 +61,7 @@ src/
 ├ app.js
 ├ core/
 │  ├ session.js
+│  ├ preferences.js
 │  ├ registry.js
 │  └ transport.js
 └ games/
@@ -58,7 +72,11 @@ src/
    ├ sniper.js
    ├ taboo.js
    ├ clock.js
-   └ ten.js
+   ├ ten.js
+   ├ code.js
+   ├ logic.js
+   ├ ev.js
+   └ auction.js
 ```
 
 各ゲームは独立したモジュールとして `registerGame()` へ登録します。`mount(ctx)` は画面離脱時のcleanup関数を返せます。
