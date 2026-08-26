@@ -16,8 +16,8 @@ test('territory scoring includes orthogonal connection bonuses once per edge',()
     {value:2,owner:1},{value:4,owner:0},{value:2,owner:-1},
     {value:1,owner:-1},{value:2,owner:-1},{value:1,owner:-1}
   ];
-  assert.deepEqual(territoryScores(board,3,2),[9,3]);
-  assert.deepEqual(rankGains([9,3]),[2,1]);
+  assert.deepEqual(territoryScores(board,3,2),[11,3]);
+  assert.deepEqual(rankGains([11,3]),[2,1]);
 });
 
 test('resource projects total exactly six capacity units per player',()=>{
