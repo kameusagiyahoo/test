@@ -2,7 +2,7 @@ import {SessionStore,rankScores} from './core/session.js';
 import {RatingStore,PartySettingsStore} from './core/preferences.js';
 import {createLocalTransport} from './core/transport.js';
 import {registerGame,getGame,listGames} from './core/registry.js';
-import {CATEGORY_DEFS,categoriesFor,categoryLabel,filterGames,recommendedGames} from './core/catalog.js';
+import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,gameMeta,pickGame,playerRangeLabel,recommendedGames} from './core/catalog.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -49,12 +49,13 @@ function bindRating(gameId){
 }
 
 function gameCardHtml(game,index){
-  const categoryTags=categoriesFor(game.id).slice(0,2).map(categoryLabel);
-  return `<button class="game-card" data-game="${game.id}"><div class="game-card-top"><span class="game-index">${String(index+1).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p><div class="game-meta">${categoryTags.map(t=>`<span>${t}</span>`).join('')}${ratingSummary(game.id)?`<span class="rating-summary">${ratingSummary(game.id)}</span>`:''}</div></button>`;
+  const categoryTags=categoriesFor(game.id).slice(0,2).map(categoryLabel),meta=gameMeta(game.id);
+  return `<button class="game-card" data-game="${game.id}"><div class="game-card-top"><span class="game-index">${String(index+1).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p><div class="game-facts"><span>${difficultyLabel(meta.difficulty)}</span><span>約${meta.minutes}分</span><span>${playerRangeLabel(meta)}推奨</span></div><div class="game-meta">${categoryTags.map(t=>`<span>${t}</span>`).join('')}${ratingSummary(game.id)?`<span class="rating-summary">${ratingSummary(game.id)}</span>`:''}</div></button>`;
 }
 
 function recommendationHtml(game){
-  return `<button class="recommend-card" data-game="${game.id}"><span class="recommend-symbol">${game.emoji}</span><span><b>${game.title}</b><small>${categoriesFor(game.id).slice(0,2).map(categoryLabel).join(' · ')}</small></span><span class="recommend-arrow">→</span></button>`;
+  const meta=gameMeta(game.id);
+  return `<button class="recommend-card" data-game="${game.id}"><span class="recommend-symbol">${game.emoji}</span><span><b>${game.title}</b><small>${difficultyLabel(meta.difficulty)} · 約${meta.minutes}分 · ${playerRangeLabel(meta)}推奨</small></span><span class="recommend-arrow">→</span></button>`;
 }
 
 function bindGameLaunch(container=app){
@@ -88,7 +89,7 @@ function renderHome(){
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
   <div class="section-head"><h2>Games</h2><span class="muted" id="catalogCount">${games.length} titles</span></div>
-  <section class="catalog-tools"><input id="gameSearch" type="search" inputmode="search" placeholder="ゲーム名・特徴で検索" aria-label="ゲーム検索"><div class="catalog-chips">${CATEGORY_DEFS.map(c=>`<button class="catalog-chip ${c.id==='all'?'active':''}" data-catalog-category="${c.id}">${c.label}</button>`).join('')}</div></section>
+  <section class="catalog-tools"><input id="gameSearch" type="search" inputmode="search" placeholder="ゲーム名・特徴で検索" aria-label="ゲーム検索"><div class="catalog-chips">${CATEGORY_DEFS.map(c=>`<button class="catalog-chip ${c.id==='all'?'active':''}" data-catalog-category="${c.id}">${c.label}</button>`).join('')}</div><div class="smart-filter-grid"><label><span>難易度</span><select id="difficultyFilter"><option value="all">指定なし</option><option value="1">かるめ</option><option value="2">標準</option><option value="3">しっかり</option></select></label><label><span>時間</span><select id="timeFilter"><option value="all">指定なし</option><option value="3">3分以内</option><option value="5">5分以内</option><option value="8">8分以内</option><option value="10">10分以内</option></select></label></div><button class="catalog-chip active-fit" id="recommendedOnly" aria-pressed="true">この${session.players.length}人におすすめだけ</button><button class="btn primary full picker-button" id="pickOne">この条件で1本選ぶ</button><div class="picker-result" id="pickerResult" hidden></div></section>
   <section class="games" id="gameCatalog"></section>
   <div class="catalog-empty" id="catalogEmpty" hidden>条件に合うゲームがありません。</div>
   <div class="footer">Party Pocket · local play on GitHub Pages</div>`;
@@ -97,7 +98,7 @@ function renderHome(){
   app.querySelector('#addPlayer').onclick=()=>{if(draftPlayers.length>=8)return toast('最大8人です');draftPlayers.push(`プレイヤー${draftPlayers.length+1}`);renderPlayers()};
   app.querySelector('#savePlayers').onclick=()=>saveDraft();
   app.querySelector('#partyMode').onclick=()=>{saveDraft({quiet:true});renderPartySetup()};
-  const catalogState={category:'all',query:''};
+  const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
   function paintCatalog(){
     const filtered=filterGames(games,catalogState);
@@ -109,7 +110,23 @@ function renderHome(){
     bindGameLaunch(catalog);
   }
   app.querySelector('#gameSearch').oninput=e=>{catalogState.query=e.target.value;paintCatalog()};
+  app.querySelector('#difficultyFilter').onchange=e=>{catalogState.difficulty=e.target.value;paintCatalog()};
+  app.querySelector('#timeFilter').onchange=e=>{catalogState.maxMinutes=e.target.value;paintCatalog()};
   app.querySelectorAll('[data-catalog-category]').forEach(button=>button.onclick=()=>{catalogState.category=button.dataset.catalogCategory;paintCatalog()});
+  app.querySelector('#recommendedOnly').onclick=e=>{
+    catalogState.recommendedOnly=!catalogState.recommendedOnly;
+    e.currentTarget.classList.toggle('active-fit',catalogState.recommendedOnly);
+    e.currentTarget.setAttribute('aria-pressed',String(catalogState.recommendedOnly));
+    paintCatalog();
+  };
+  app.querySelector('#pickOne').onclick=()=>{
+    const picked=pickGame(games,catalogState),box=app.querySelector('#pickerResult');
+    if(!picked){box.hidden=true;return toast('この条件に合うゲームがありません')}
+    const meta=gameMeta(picked.id);
+    box.hidden=false;
+    box.innerHTML=`<div><div class="eyebrow">SMART PICK</div><b>${picked.emoji} ${picked.title}</b><small>${difficultyLabel(meta.difficulty)} · 約${meta.minutes}分 · ${playerRangeLabel(meta)}推奨</small></div><button class="btn primary" data-game="${picked.id}">これで遊ぶ</button>`;
+    bindGameLaunch(box);
+  };
   bindGameLaunch(app.querySelector('#recommendGrid'));
   paintCatalog();
   app.querySelector('#resumeParty')?.addEventListener('click',()=>{if(session.resumeParty()){draftPlayers=[...session.players];renderPartyIntermission(false,null,true)}});
