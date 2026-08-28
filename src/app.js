@@ -2,6 +2,7 @@ import {SessionStore,rankScores} from './core/session.js';
 import {RatingStore,PartySettingsStore} from './core/preferences.js';
 import {createLocalTransport} from './core/transport.js';
 import {registerGame,getGame,listGames} from './core/registry.js';
+import {CATEGORY_DEFS,categoriesFor,categoryLabel,filterGames,recommendedGames} from './core/catalog.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -47,6 +48,19 @@ function bindRating(gameId){
   });
 }
 
+function gameCardHtml(game,index){
+  const categoryTags=categoriesFor(game.id).slice(0,2).map(categoryLabel);
+  return `<button class="game-card" data-game="${game.id}"><div class="game-card-top"><span class="game-index">${String(index+1).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p><div class="game-meta">${categoryTags.map(t=>`<span>${t}</span>`).join('')}${ratingSummary(game.id)?`<span class="rating-summary">${ratingSummary(game.id)}</span>`:''}</div></button>`;
+}
+
+function recommendationHtml(game){
+  return `<button class="recommend-card" data-game="${game.id}"><span class="recommend-symbol">${game.emoji}</span><span><b>${game.title}</b><small>${categoriesFor(game.id).slice(0,2).map(categoryLabel).join(' · ')}</small></span><span class="recommend-arrow">→</span></button>`;
+}
+
+function bindGameLaunch(container=app){
+  container.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>{saveDraft({quiet:true});session.startSingle();startGame(button.dataset.game)});
+}
+
 homeButton.onclick=()=>{disposeActiveGame();renderHome()};
 
 function saveDraft({quiet=false}={}){
@@ -71,15 +85,33 @@ function renderHome(){
   <section class="panel"><div id="playerList" class="stack"></div><div class="actions"><button class="btn quiet" id="addPlayer">プレイヤー追加</button><button class="btn primary" id="savePlayers">保存</button></div></section>
   <div class="section-head"><h2>Play</h2><span class="muted">おすすめは Party</span></div>
   <section class="mode-grid"><button class="mode-card featured" id="partyMode"><div class="mode-kicker">PARTY</div><h3>総合戦を組む</h3><p>3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。</p><span class="text-link">設定して始める →</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>下の一覧から選択。先に5点取ったプレイヤーが勝ちです。</p></div></section>
-  <div class="section-head"><h2>Games</h2><span class="muted">${games.length} titles</span></div>
-  <section class="games">${games.map((g,i)=>`<button class="game-card" data-game="${g.id}"><div class="game-card-top"><span class="game-index">${String(i+1).padStart(2,'0')}</span><span class="game-symbol">${g.emoji}</span></div><h3>${g.title}</h3><p>${g.description}</p><div class="game-meta">${g.tags.map(t=>`<span>${t}</span>`).join('')}${ratingSummary(g.id)?`<span class="rating-summary">${ratingSummary(g.id)}</span>`:''}</div></button>`).join('')}</section>
+  <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
+  <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
+  <div class="section-head"><h2>Games</h2><span class="muted" id="catalogCount">${games.length} titles</span></div>
+  <section class="catalog-tools"><input id="gameSearch" type="search" inputmode="search" placeholder="ゲーム名・特徴で検索" aria-label="ゲーム検索"><div class="catalog-chips">${CATEGORY_DEFS.map(c=>`<button class="catalog-chip ${c.id==='all'?'active':''}" data-catalog-category="${c.id}">${c.label}</button>`).join('')}</div></section>
+  <section class="games" id="gameCatalog"></section>
+  <div class="catalog-empty" id="catalogEmpty" hidden>条件に合うゲームがありません。</div>
   <div class="footer">Party Pocket · local play on GitHub Pages</div>`;
 
   renderPlayers();
   app.querySelector('#addPlayer').onclick=()=>{if(draftPlayers.length>=8)return toast('最大8人です');draftPlayers.push(`プレイヤー${draftPlayers.length+1}`);renderPlayers()};
   app.querySelector('#savePlayers').onclick=()=>saveDraft();
   app.querySelector('#partyMode').onclick=()=>{saveDraft({quiet:true});renderPartySetup()};
-  app.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>{saveDraft({quiet:true});session.startSingle();startGame(button.dataset.game)});
+  const catalogState={category:'all',query:''};
+  const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
+  function paintCatalog(){
+    const filtered=filterGames(games,catalogState);
+    const catalog=app.querySelector('#gameCatalog'),empty=app.querySelector('#catalogEmpty');
+    catalog.innerHTML=filtered.map(g=>gameCardHtml(g,catalogIndex.get(g.id))).join('');
+    empty.hidden=filtered.length!==0;
+    app.querySelector('#catalogCount').textContent=`${filtered.length} / ${games.length}`;
+    app.querySelectorAll('[data-catalog-category]').forEach(b=>b.classList.toggle('active',b.dataset.catalogCategory===catalogState.category));
+    bindGameLaunch(catalog);
+  }
+  app.querySelector('#gameSearch').oninput=e=>{catalogState.query=e.target.value;paintCatalog()};
+  app.querySelectorAll('[data-catalog-category]').forEach(button=>button.onclick=()=>{catalogState.category=button.dataset.catalogCategory;paintCatalog()});
+  bindGameLaunch(app.querySelector('#recommendGrid'));
+  paintCatalog();
   app.querySelector('#resumeParty')?.addEventListener('click',()=>{if(session.resumeParty()){draftPlayers=[...session.players];renderPartyIntermission(false,null,true)}});
   app.querySelector('#discardParty')?.addEventListener('click',()=>{session.clearSavedParty();renderHome()});
 }
