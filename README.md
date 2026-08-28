@@ -43,6 +43,19 @@ GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲ�
 ### Single Game
 好きな1ゲームを選び、先に5点取った人が勝利。
 
+### Game Catalog
+21ゲームをカテゴリ・検索で絞り込めます。現在の参加人数に応じておすすめ3本も表示します。
+
+カテゴリ:
+- すべて
+- 軽い
+- 会話
+- 頭脳
+- 戦略
+- 先読み
+- 完全情報
+- 2人向け
+
 ### Party Mode
 3 / 6 / 9ラウンドを選択し、使用ゲームも自由に選べます。
 
@@ -78,6 +91,7 @@ src/
 │  ├ session.js
 │  ├ preferences.js
 │  ├ registry.js
+│  ├ catalog.js
 │  └ transport.js
 └ games/
    ├ sync.js
