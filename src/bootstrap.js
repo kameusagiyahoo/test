@@ -2,18 +2,26 @@ import {registerGame} from './core/registry.js';
 import {gridGame} from './games/grid.js';
 import {allocationGame} from './games/allocation.js';
 import {portfolioGame} from './games/portfolio.js';
+import {sequenceGame} from './games/sequence.js';
+import {frontlineGame} from './games/frontline.js';
+import {priorityGame} from './games/priority.js';
 
-[gridGame,allocationGame,portfolioGame].forEach(registerGame);
+[gridGame,allocationGame,portfolioGame,sequenceGame,frontlineGame,priorityGame].forEach(registerGame);
 
-// Add newly introduced games to an existing saved Party selection once, without
-// disturbing games the player intentionally excluded before this release.
 try{
-  const key='partyPocketPartySettingsV1',raw=localStorage.getItem(key);
-  if(raw){
-    const value=JSON.parse(raw);if(Array.isArray(value?.gameIds)){
-      const ids=[...new Set([...value.gameIds,'grid','allocation','portfolio'])];
-      localStorage.setItem(key,JSON.stringify({...value,gameIds:ids}));
+  const settingsKey='partyPocketPartySettingsV1';
+  const migrationKey='partyPocketExtraGamesMigrationV2';
+  if(!localStorage.getItem(migrationKey)){
+    const raw=localStorage.getItem(settingsKey);
+    if(raw){
+      const value=JSON.parse(raw);
+      if(Array.isArray(value?.gameIds)){
+        const extras=['grid','allocation','portfolio','sequence','frontline','priority'];
+        const ids=[...new Set([...value.gameIds,...extras])];
+        localStorage.setItem(settingsKey,JSON.stringify({...value,gameIds:ids}));
+      }
     }
+    localStorage.setItem(migrationKey,'1');
   }
 }catch{}
 
