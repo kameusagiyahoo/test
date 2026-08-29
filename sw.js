@@ -18,6 +18,7 @@ const APP_SHELL=[
   './src/core/stats.js',
   './src/core/health.js',
   './src/core/solo.js',
+  './src/core/pwa.js',
   './src/games/sync.js',
   './src/games/bomb.js',
   './src/games/five.js',
