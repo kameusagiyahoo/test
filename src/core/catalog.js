@@ -6,6 +6,7 @@ export const CATEGORY_DEFS=[
   {id:'strategy',label:'戦略'},
   {id:'foresight',label:'先読み'},
   {id:'perfect',label:'完全情報'},
+  {id:'solo',label:'1人向け'},
   {id:'duel',label:'2人向け'}
 ];
 
@@ -30,7 +31,10 @@ const GAME_CATEGORIES={
   priority:['strategy','foresight'],
   isolation:['strategy','foresight','perfect','duel'],
   gate:['strategy','foresight','perfect','duel'],
-  triad:['brain','strategy','foresight','perfect','duel']
+  triad:['brain','strategy','foresight','perfect','duel'],
+  memory:['quick','brain','solo'],
+  route:['brain','strategy','solo'],
+  pattern:['quick','brain','solo']
 };
 
 const GAME_META={
@@ -54,10 +58,14 @@ const GAME_META={
   priority:{difficulty:3,minutes:8,minPlayers:3,maxPlayers:6},
   isolation:{difficulty:3,minutes:10,minPlayers:2,maxPlayers:4},
   gate:{difficulty:3,minutes:10,minPlayers:2,maxPlayers:4},
-  triad:{difficulty:3,minutes:10,minPlayers:2,maxPlayers:4}
+  triad:{difficulty:3,minutes:10,minPlayers:2,maxPlayers:4},
+  memory:{difficulty:1,minutes:3,minPlayers:1,maxPlayers:8},
+  route:{difficulty:2,minutes:5,minPlayers:1,maxPlayers:8},
+  pattern:{difficulty:2,minutes:4,minPlayers:1,maxPlayers:8}
 };
 
 const RECOMMENDATIONS={
+  1:['memory','route','pattern'],
   2:['isolation','code','gate'],
   small:['triad','logic','auction'],
   large:['minority','allocation','frontline']
@@ -114,6 +122,7 @@ export function pickGame(games,filters={},rng=Math.random){
 }
 
 export function recommendedIds(playerCount){
+  if(playerCount<=1)return [...RECOMMENDATIONS[1]];
   if(playerCount<=2)return [...RECOMMENDATIONS[2]];
   if(playerCount<=4)return [...RECOMMENDATIONS.small];
   return [...RECOMMENDATIONS.large];
