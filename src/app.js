@@ -1,5 +1,5 @@
 import {SessionStore,rankScores} from './core/session.js';
-import {RatingStore,PartySettingsStore,LibraryStore} from './core/preferences.js';
+import {RatingStore,PartySettingsStore,LibraryStore,PlaytestStore} from './core/preferences.js';
 import {createLocalTransport} from './core/transport.js';
 import {registerGame,getGame,listGames} from './core/registry.js';
 import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,gameMeta,pickGame,playerRangeLabel,recommendedGames} from './core/catalog.js';
@@ -24,6 +24,7 @@ const session=new SessionStore({transport});
 const ratings=new RatingStore(globalThis.localStorage);
 const partySettings=new PartySettingsStore(globalThis.localStorage);
 const library=new LibraryStore(globalThis.localStorage);
+const playtests=new PlaytestStore(globalThis.localStorage);
 const app=document.querySelector('#app');
 const badge=document.querySelector('#sessionBadge');
 const homeButton=document.querySelector('#homeButton');
@@ -37,17 +38,33 @@ function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clea
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
 function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
-function ratingSummary(gameId){const r=ratings.get(gameId);return r.total?`また遊びたい ${r.good}/${r.total}`:''}
-function ratingPromptHtml(gameId){
-  const game=getGame(gameId);if(!game)return'';const r=ratings.get(gameId);
-  return `<section class="feedback" data-rating-game="${gameId}"><div><div class="eyebrow">PERSONAL NOTE</div><strong>${esc(game.title)}をどう感じた？</strong><div class="feedback-history">${r.total?`これまで ${r.total}回評価 · また遊びたい ${r.good}回`:'この端末だけに記録します'}</div></div><div class="rating-actions"><button class="rating-btn" data-rate="good">また遊びたい</button><button class="rating-btn" data-rate="neutral">普通</button><button class="rating-btn" data-rate="bad">見直したい</button></div></section>`;
+function oneDecimal(value){return Number.isFinite(value)?value.toFixed(1):'—'}
+function ratingSummary(gameId){
+  const p=playtests.get(gameId);
+  if(p.responses)return `評価 ${p.responses}回 · 面白さ ${oneDecimal(p.fun.average)}`;
+  const r=ratings.get(gameId);return r.total?`旧評価 ${r.total}回`:'';
 }
-function bindRating(gameId){
-  const wrap=app.querySelector(`[data-rating-game="${gameId}"]`);if(!wrap)return;let done=false;
-  wrap.querySelectorAll('[data-rate]').forEach(button=>button.onclick=()=>{
-    if(done)return;done=true;const value=button.dataset.rate;const r=ratings.rate(gameId,value);
-    wrap.querySelector('.rating-actions').innerHTML=`<div class="rating-saved">記録しました · また遊びたい ${r.good}/${r.total}</div>`;
+function scoreButtons(axis){
+  return [1,2,3,4,5].map(score=>`<button class="score-choice" data-axis="${axis}" data-score="${score}" aria-pressed="false">${score}</button>`).join('');
+}
+function playtestPromptHtml(gameId){
+  const game=getGame(gameId);if(!game)return'';const p=playtests.get(gameId);
+  return `<section class="feedback playtest-card" data-playtest-game="${gameId}"><div><div class="eyebrow">PLAYTEST NOTE</div><strong>${esc(game.title)}を4軸で評価</strong><div class="feedback-history">${p.responses?`新評価 ${p.responses}回 · 面白さ ${oneDecimal(p.fun.average)} · 分かりやすさ ${oneDecimal(p.clarity.average)}`:p.legacyResponses?`旧「また遊びたい」評価 ${p.legacyResponses}件を引き継ぎ済み`:'この端末だけに記録します'}</div></div><div class="playtest-fields"><div class="playtest-row"><span>面白さ</span><div class="score-choices">${scoreButtons('fun')}</div></div><div class="playtest-row"><span>分かりやすさ</span><div class="score-choices">${scoreButtons('clarity')}</div></div><div class="playtest-row"><span>頭を使う度</span><div class="score-choices">${scoreButtons('brain')}</div></div><div class="playtest-row"><span>もう一度遊びたい</span><div class="score-choices">${scoreButtons('replay')}</div></div></div><button class="btn primary full playtest-save" disabled>4項目を記録</button></section>`;
+}
+function bindPlaytest(gameId){
+  const wrap=app.querySelector(`[data-playtest-game="${gameId}"]`);if(!wrap)return;
+  const scores={};const save=wrap.querySelector('.playtest-save');
+  wrap.querySelectorAll('[data-axis][data-score]').forEach(button=>button.onclick=()=>{
+    const axis=button.dataset.axis,s=Number(button.dataset.score);scores[axis]=s;
+    wrap.querySelectorAll(`[data-axis="${axis}"]`).forEach(b=>{const on=Number(b.dataset.score)===s;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on))});
+    save.disabled=!['fun','clarity','brain','replay'].every(key=>scores[key]);
   });
+  save.onclick=()=>{
+    if(save.disabled)return;
+    const result=playtests.submit(gameId,scores);
+    ratings.rate(gameId,scores.replay>=4?'good':scores.replay===3?'neutral':'bad');
+    wrap.innerHTML=`<div><div class="eyebrow">SAVED</div><strong>プレイテスト評価を記録しました</strong><div class="feedback-history">面白さ ${oneDecimal(result.fun.average)} · 分かりやすさ ${oneDecimal(result.clarity.average)} · 頭を使う度 ${oneDecimal(result.brain.average)} · また遊びたい ${oneDecimal(result.replay.average)}</div></div>`;
+  };
 }
 
 function gameCardHtml(game,index){
@@ -108,6 +125,7 @@ function renderHome(){
   <section class="panel"><div id="playerList" class="stack"></div><div class="actions"><button class="btn quiet" id="addPlayer">プレイヤー追加</button><button class="btn primary" id="savePlayers">保存</button></div></section>
   <div class="section-head"><h2>Play</h2><span class="muted">おすすめは Party</span></div>
   <section class="mode-grid"><button class="mode-card featured" id="partyMode"><div class="mode-kicker">PARTY</div><h3>総合戦を組む</h3><p>3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。</p><span class="text-link">設定して始める →</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>下の一覧から選択。先に5点取ったプレイヤーが勝ちです。</p></div></section>
+  <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>21ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
   ${favoriteGames.length?`<div class="section-head"><h2>Favorites</h2><span class="muted">${favoriteGames.length} games</span></div><section class="library-list" id="favoriteList">${favoriteGames.map(libraryRowHtml).join('')}</section>`:''}
@@ -122,6 +140,7 @@ function renderHome(){
   app.querySelector('#addPlayer').onclick=()=>{if(draftPlayers.length>=8)return toast('最大8人です');draftPlayers.push(`プレイヤー${draftPlayers.length+1}`);renderPlayers()};
   app.querySelector('#savePlayers').onclick=()=>saveDraft();
   app.querySelector('#partyMode').onclick=()=>{saveDraft({quiet:true});renderPartySetup()};
+  app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
   function paintCatalog(){
@@ -157,6 +176,36 @@ function renderHome(){
   paintCatalog();
   app.querySelector('#resumeParty')?.addEventListener('click',()=>{if(session.resumeParty()){draftPlayers=[...session.players];renderPartyIntermission(false,null,true)}});
   app.querySelector('#discardParty')?.addEventListener('click',()=>{session.clearSavedParty();renderHome()});
+}
+
+function playtestStatus(row){
+  if(row.responses<2)return{label:row.responses?'評価追加待ち':'未評価',tone:'muted'};
+  if(row.qualityAverage<3.3)return{label:'改善優先',tone:'weak'};
+  if(row.qualityAverage<4)return{label:'要観察',tone:'watch'};
+  return{label:'好調',tone:'good'};
+}
+
+function weakestAxis(row){
+  const axes=[['面白さ',row.fun.average],['分かりやすさ',row.clarity.average],['また遊びたい',row.replay.average]].filter(([,v])=>Number.isFinite(v));
+  if(!axes.length)return'データなし';
+  axes.sort((a,b)=>a[1]-b[1]);return `${axes[0][0]} ${oneDecimal(axes[0][1])}`;
+}
+
+function renderPlaytestLab(){
+  disposeActiveGame();
+  const games=listGames(),byId=new Map(games.map(g=>[g.id,g]));
+  const report=playtests.report(games.map(g=>g.id)).map(row=>({...row,game:byId.get(row.gameId)}));
+  const evaluated=report.filter(r=>r.responses>0).length;
+  const stable=report.filter(r=>r.responses>=2);
+  const weak=stable.filter(r=>r.qualityAverage<3.3).length;
+  const ordered=[...report].sort((a,b)=>{
+    const ag=a.responses>=2?0:a.responses?1:2,bg=b.responses>=2?0:b.responses?1:2;
+    return ag-bg||(a.qualityAverage??99)-(b.qualityAverage??99)||b.responses-a.responses;
+  });
+  updateBadge('PLAYTEST LAB');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="labBack">←</button><div><div class="eyebrow">PLAYTEST LAB</div><div class="screen-title">ゲーム品質を確認</div></div></div><section class="lab-summary"><div><b>${evaluated}</b><span>/ ${games.length} 評価済み</span></div><div><b>${stable.length}</b><span>2回以上</span></div><div><b>${weak}</b><span>改善優先</span></div></section><div class="lab-note">改善優先度は「面白さ・分かりやすさ・もう一度遊びたい」の平均で判定。頭を使う度はゲーム特性として別表示します。</div><section class="lab-list">${ordered.map(row=>{const s=playtestStatus(row),g=row.game;return`<button class="lab-row" data-game="${row.gameId}"><span class="lab-symbol">${g?.emoji||''}</span><span class="lab-main"><b>${esc(g?.title||row.gameId)}</b><small>${row.responses? `品質 ${oneDecimal(row.qualityAverage)} · 頭脳 ${oneDecimal(row.brain.average)} · ${row.responses}回`:row.legacyResponses?`新4軸評価なし · 旧評価 ${row.legacyResponses}件`:'まだ評価なし'}</small><small>${row.responses? `弱い軸: ${weakestAxis(row)}`:'プレイ後に4軸評価を記録してください'}</small></span><span class="lab-status ${s.tone}">${s.label}</span></button>`}).join('')}</section>`;
+  app.querySelector('#labBack').onclick=renderHome;
+  bindGameLaunch(app.querySelector('.lab-list'));
 }
 
 function renderPartySetup(){
@@ -221,15 +270,15 @@ function renderPartyIntermission(first=false,result=null,resuming=false,complete
   updateBadge(`Round ${session.party.round+1}/${session.party.totalRounds}`);
   const awardHtml=result?`<section class="card result-card"><div class="eyebrow">ROUND RESULT</div><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>+${result.awards[i]} Party pt</span></div>`).join('')}</div></section>`:'';
   const resumeNote=resuming?'<div class="notice">保存地点から再開しました。途中だったラウンドは最初から始まります。</div>':'';
-  app.innerHTML=`<section class="panel party-board"><div class="eyebrow">PARTY</div><div class="prompt compact">${first?'構成完了':resuming?'ゲームを再開':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${resumeNote}${awardHtml}${completedGameId?ratingPromptHtml(completedGameId):''}<div class="standings"><div class="setup-label">Standings</div><div class="result-list">${rankingHtml(session.partyScores,'Party pt')}</div></div><div class="next-game"><div class="game-card-top"><span class="game-index">${String(session.party.round+1).padStart(2,'0')} / ${String(session.party.totalRounds).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p></div><button class="btn primary full" id="partyNext">${first?'開始する':resuming?'このラウンドを始める':'次へ'}</button></section>`;
-  if(completedGameId)bindRating(completedGameId);app.querySelector('#partyNext').onclick=()=>startGame(nextId);
+  app.innerHTML=`<section class="panel party-board"><div class="eyebrow">PARTY</div><div class="prompt compact">${first?'構成完了':resuming?'ゲームを再開':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${resumeNote}${awardHtml}${completedGameId?playtestPromptHtml(completedGameId):''}<div class="standings"><div class="setup-label">Standings</div><div class="result-list">${rankingHtml(session.partyScores,'Party pt')}</div></div><div class="next-game"><div class="game-card-top"><span class="game-index">${String(session.party.round+1).padStart(2,'0')} / ${String(session.party.totalRounds).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p></div><button class="btn primary full" id="partyNext">${first?'開始する':resuming?'このラウンドを始める':'次へ'}</button></section>`;
+  if(completedGameId)bindPlaytest(completedGameId);app.querySelector('#partyNext').onclick=()=>startGame(nextId);
 }
 
 function renderWinner(isParty,ratingGameId=null){
   disposeActiveGame();const winners=session.winnerIndexes(isParty),scores=isParty?session.partyScores:session.scores;
   updateBadge('RESULT');
-  app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${ratingGameId?ratingPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
-  if(ratingGameId)bindRating(ratingGameId);
+  app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${ratingGameId?playtestPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
+  if(ratingGameId)bindPlaytest(ratingGameId);
   app.querySelector('#homeResult').onclick=renderHome;
   app.querySelector('#againResult').onclick=()=>{
     if(isParty){const games=listGames(),settings=partySettings.load(games.map(g=>g.id));session.startParty(settings.gameIds,settings.rounds);return renderPartyIntermission(true)}
