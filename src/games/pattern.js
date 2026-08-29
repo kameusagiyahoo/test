@@ -24,15 +24,16 @@ const BUILDERS=[
 
 export function makePatternPuzzle(rng=Math.random){
   const base=BUILDERS[Math.floor(rng()*BUILDERS.length)](rng);
-  const distractors=new Set();
-  const offsets=[-4,-3,-2,-1,1,2,3,4];
-  let guard=0;
-  while(distractors.size<3&&guard++<30){
-    const off=offsets[Math.floor(rng()*offsets.length)];
-    const v=base.answer+off;if(v!==base.answer&&v>=0)distractors.add(v);
+  const choicesSet=new Set([base.answer]);
+  const offsets=[-4,-3,-2,-1,1,2,3,4,5,-5,6,-6];
+  const start=Math.floor(rng()*offsets.length);
+  for(let step=0;choicesSet.size<4&&step<offsets.length;step++){
+    const off=offsets[(start+step)%offsets.length],v=base.answer+off;
+    if(v>=0)choicesSet.add(v);
   }
-  let choices=[base.answer,...distractors];
-  while(choices.length<4)choices.push(base.answer+choices.length+1);
+  let fallback=1;
+  while(choicesSet.size<4){choicesSet.add(base.answer+fallback);fallback++}
+  let choices=[...choicesSet];
   for(let i=choices.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[choices[i],choices[j]]=[choices[j],choices[i]]}
   return{...base,choices};
 }
