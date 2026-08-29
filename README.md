@@ -10,6 +10,7 @@ GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲ�
 - 複数端末同期: なし
 - プレイヤー名・Party設定・評価・Party途中状態をlocalStorageへ保存
 - プレイテスト評価は4軸で端末内集計
+- 完了したSingle / Partyラウンドを端末内のプレイ履歴として保存
 - スマホ1台を順番に回して遊ぶ
 
 ## Games
@@ -43,6 +44,15 @@ GitHub Pagesだけで動く、2〜8人向けのスマホ1台パーティーゲ�
 
 ### Single Game
 ゲームを選ぶと、まず詳細画面で目的・手順・勝ち方・具体例を確認できます。「このゲームを始める」からSingle Gameを開始し、先に5点取った人が勝利します。
+
+### Local Stats
+- Singleは5点先取で完走した時に1試合として記録
+- Partyは各ラウンド終了時に1試合として記録
+- 途中離脱は記録しない
+- プレイヤー別: 試合数 / 勝利数 / 勝率 / Single・Party内訳
+- ゲーム別: プレイ回数 / Single・Party内訳 / 最多勝プレイヤー
+- 最近の結果を最大20件表示
+- 履歴本体は最大200試合をlocalStorageへ保存
 
 ### Playtest Lab
 - プレイ後に1〜5で4軸評価
@@ -120,6 +130,7 @@ src/
 │  ├ registry.js
 │  ├ catalog.js
 │  ├ game-guide.js
+│  ├ stats.js
 │  └ transport.js
 └ games/
    ├ sync.js
