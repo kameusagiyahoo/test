@@ -5,6 +5,7 @@ import {registerGame,getGame,listGames} from './core/registry.js';
 import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,gameMeta,pickGame,playerRangeLabel,recommendedGames} from './core/catalog.js';
 import {gameGuide} from './core/game-guide.js';
 import {StatsStore,winnerIndexesFromScores} from './core/stats.js';
+import {buildHealthReport} from './core/health.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -129,6 +130,7 @@ function renderHome(){
   <section class="mode-grid"><button class="mode-card featured" id="partyMode"><div class="mode-kicker">PARTY</div><h3>総合戦を組む</h3><p>3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。</p><span class="text-link">設定して始める →</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>下の一覧から選択。先に5点取ったプレイヤーが勝ちです。</p></div></section>
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>21ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
+  <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
   ${favoriteGames.length?`<div class="section-head"><h2>Favorites</h2><span class="muted">${favoriteGames.length} games</span></div><section class="library-list" id="favoriteList">${favoriteGames.map(libraryRowHtml).join('')}</section>`:''}
@@ -145,6 +147,7 @@ function renderHome(){
   app.querySelector('#partyMode').onclick=()=>{saveDraft({quiet:true});renderPartySetup()};
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
+  app.querySelector('#gameHealth').onclick=renderGameHealth;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
   function paintCatalog(){
@@ -236,6 +239,30 @@ function renderStatsDashboard(){
   <section class="history-list">${report.recent.length?report.recent.map(entry=>{const g=byId.get(entry.gameId),winnerNames=entry.winners.map(i=>entry.players[i]).filter(Boolean);return`<div class="history-row"><span class="history-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||entry.gameId)}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${winnerNames.length?`勝者 ${winnerNames.map(esc).join(' & ')}`:'勝者なし'}</small></span><time>${formatPlayedAt(entry.at)}</time></div>`}).join(''):'<div class="catalog-empty">履歴はまだありません。</div>'}</section>`;
   app.querySelector('#statsBack').onclick=renderHome;
   app.querySelectorAll('.game-stat-row[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+}
+
+function healthStatusLabel(status){
+  return status==='action'?'改善優先':status==='watch'?'要観察':status==='data'?'データ収集中':'健全';
+}
+
+function renderGameHealth(){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
+  const pRows=playtests.report(ids);
+  const sReport=stats.report(ids);
+  const report=buildHealthReport(ids,pRows,sReport.gameStats);
+  updateBadge('GAME HEALTH');
+
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="healthBack">←</button><div><div class="eyebrow">GAME HEALTH</div><div class="screen-title">改善対象を自動分析</div></div></div>
+  <section class="health-summary"><div class="health-action"><b>${report.actionCount}</b><span>改善優先</span></div><div class="health-watch"><b>${report.watchCount}</b><span>要観察</span></div><div class="health-data"><b>${report.dataCount}</b><span>データ収集中</span></div><div class="health-good"><b>${report.healthyCount}</b><span>健全</span></div></section>
+  <div class="lab-note">誤判定を避けるため、評価系は新4軸評価2件以上、勝率偏りは5試合以上かつ対象プレイヤー4試合以上・勝率75%以上でのみ警告します。</div>
+  <section class="health-list">${report.priority.map(row=>{
+    const game=byId.get(row.gameId),primary=row.issues[0];
+    return`<article class="health-card ${row.status}"><button class="health-card-head" data-game="${row.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||row.gameId)}</b><small>${row.plays}試合 · 新4軸評価 ${row.reviews}件</small></span><span class="health-status ${row.status}">${healthStatusLabel(row.status)}</span></button>${row.issues.length?`<div class="health-issues">${row.issues.map(item=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p></div>`).join('')}</div>`:'<div class="health-issues"><div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div></div>'}</article>`;
+  }).join('')}</section>`;
+
+  app.querySelector('#healthBack').onclick=renderHome;
+  app.querySelectorAll('.health-card-head[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
 }
 
 function renderPartySetup(){
