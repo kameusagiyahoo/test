@@ -77,6 +77,6 @@ export class StatsStore{
 export function winnerIndexesFromScores(scores){
   if(!Array.isArray(scores)||!scores.length)return[];
   const max=Math.max(...scores.map(Number));
-  if(!Number.isFinite(max))return[];
+  if(!Number.isFinite(max)||max<=0)return[];
   return scores.map((score,i)=>Number(score)===max?i:-1).filter(i=>i>=0);
 }
