@@ -6,7 +6,7 @@ function safePlayers(storage){
   try{
     for(const key of [PLAYER_KEY,...LEGACY_PLAYER_KEYS]){
       const value=storage?.getItem?.(key);
-      if(value){const parsed=JSON.parse(value);if(Array.isArray(parsed)&&parsed.length>=2)return parsed}
+      if(value){const parsed=JSON.parse(value);if(Array.isArray(parsed)&&parsed.length>=1)return parsed}
     }
   }catch{}
   return ['プレイヤー1','プレイヤー2'];
@@ -64,7 +64,8 @@ export class SessionStore{
   snapshot(){return{players:[...this.players],scores:[...this.scores],partyScores:[...this.partyScores],mode:this.mode,party:{...this.party,schedule:[...this.party.schedule]}}}
   emit(){this.transport?.publish?.('session:state',this.snapshot())}
   savePlayers(names){
-    const normalized=names.map((n,i)=>(n||'').trim()||`プレイヤー${i+1}`);
+    const source=Array.isArray(names)&&names.length?names:['プレイヤー1'];
+    const normalized=source.map((n,i)=>(n||'').trim()||`プレイヤー${i+1}`);
     const changed=normalized.length!==this.players.length||normalized.some((name,i)=>name!==this.players[i]);
     this.players=normalized;this.storage?.setItem?.(PLAYER_KEY,JSON.stringify(this.players));
     this.resetScores();this.partyScores=Array(this.players.length).fill(0);if(changed)this.clearSavedParty();this.emit();
@@ -73,6 +74,7 @@ export class SessionStore{
   addScore(index,points=1){this.scores[index]=(this.scores[index]||0)+points;this.emit()}
   startSingle(){this.mode='single';this.party.active=false;this.resetScores();this.emit()}
   startParty(gameIds,totalRounds=6,rng=Math.random){
+    if(this.players.length<2)throw new Error('party requires at least two players');
     this.mode='party';this.resetScores();this.partyScores=Array(this.players.length).fill(0);
     const schedule=buildPartySchedule(gameIds,totalRounds,rng);
     this.party={round:0,totalRounds:schedule.length,schedule,active:true,lastAward:null};this.savePartyCheckpoint();this.emit();
