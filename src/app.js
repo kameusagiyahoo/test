@@ -4,6 +4,7 @@ import {createLocalTransport} from './core/transport.js';
 import {registerGame,getGame,listGames} from './core/registry.js';
 import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,gameMeta,pickGame,playerRangeLabel,recommendedGames} from './core/catalog.js';
 import {gameGuide} from './core/game-guide.js';
+import {StatsStore,winnerIndexesFromScores} from './core/stats.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -25,6 +26,7 @@ const ratings=new RatingStore(globalThis.localStorage);
 const partySettings=new PartySettingsStore(globalThis.localStorage);
 const library=new LibraryStore(globalThis.localStorage);
 const playtests=new PlaytestStore(globalThis.localStorage);
+const stats=new StatsStore(globalThis.localStorage);
 const app=document.querySelector('#app');
 const badge=document.querySelector('#sessionBadge');
 const homeButton=document.querySelector('#homeButton');
@@ -126,6 +128,7 @@ function renderHome(){
   <div class="section-head"><h2>Play</h2><span class="muted">おすすめは Party</span></div>
   <section class="mode-grid"><button class="mode-card featured" id="partyMode"><div class="mode-kicker">PARTY</div><h3>総合戦を組む</h3><p>3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。</p><span class="text-link">設定して始める →</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>下の一覧から選択。先に5点取ったプレイヤーが勝ちです。</p></div></section>
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>21ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
+  <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
   ${favoriteGames.length?`<div class="section-head"><h2>Favorites</h2><span class="muted">${favoriteGames.length} games</span></div><section class="library-list" id="favoriteList">${favoriteGames.map(libraryRowHtml).join('')}</section>`:''}
@@ -141,6 +144,7 @@ function renderHome(){
   app.querySelector('#savePlayers').onclick=()=>saveDraft();
   app.querySelector('#partyMode').onclick=()=>{saveDraft({quiet:true});renderPartySetup()};
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
+  app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
   function paintCatalog(){
@@ -208,6 +212,32 @@ function renderPlaytestLab(){
   bindGameLaunch(app.querySelector('.lab-list'));
 }
 
+function percent(value){return `${Math.round((Number(value)||0)*100)}%`}
+function formatPlayedAt(at){
+  try{return new Date(at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+  catch{return''}
+}
+
+function renderStatsDashboard(){
+  disposeActiveGame();
+  const games=listGames(),byId=new Map(games.map(g=>[g.id,g])),report=stats.report(games.map(g=>g.id));
+  const gameRows=report.gameStats.map(row=>({...row,game:byId.get(row.gameId)}));
+  const mostPlayed=gameRows[0];
+  updateBadge('LOCAL STATS');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="statsBack">←</button><div><div class="eyebrow">LOCAL STATS</div><div class="screen-title">プレイ履歴と勝率</div></div></div>
+  <section class="lab-summary stats-summary"><div><b>${report.totalPlays}</b><span>記録試合</span></div><div><b>${report.gamesPlayed}</b><span>/ ${games.length} games</span></div><div><b>${report.playerStats.length}</b><span>players</span></div></section>
+  <div class="lab-note">Singleは5点先取で完走した時に1試合、Partyは各ラウンド終了時に1試合として記録します。途中離脱は集計しません。</div>
+  ${mostPlayed?`<section class="stat-highlight"><div class="eyebrow">MOST PLAYED</div><b>${mostPlayed.game?.emoji||''} ${esc(mostPlayed.game?.title||mostPlayed.gameId)}</b><span>${mostPlayed.plays}試合</span></section>`:''}
+  <div class="section-head compact-head"><h2>Players</h2><span class="muted">勝利数 / 勝率</span></div>
+  <section class="stats-list">${report.playerStats.length?report.playerStats.map((p,i)=>`<div class="stats-row"><span class="stats-rank">${String(i+1).padStart(2,'0')}</span><span><b>${esc(p.name)}</b><small>${p.plays}試合 · Single ${p.single} / Party ${p.party}</small></span><span class="stats-value"><b>${p.wins}勝</b><small>${percent(p.winRate)}</small></span></div>`).join(''):'<div class="catalog-empty">まだ完了した試合がありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Games</h2><span class="muted">プレイ回数</span></div>
+  <section class="stats-list">${gameRows.length?gameRows.map(row=>`<button class="stats-row game-stat-row" data-game="${row.gameId}"><span class="lab-symbol">${row.game?.emoji||''}</span><span><b>${esc(row.game?.title||row.gameId)}</b><small>Single ${row.single} · Party ${row.party}${row.leader?` ·最多勝 ${esc(row.leader.name)} ${row.leader.wins}勝`:''}</small></span><span class="stats-value"><b>${row.plays}</b><small>plays</small></span></button>`).join(''):'<div class="catalog-empty">ゲーム別データはまだありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Recent results</h2><span class="muted">最大20件</span></div>
+  <section class="history-list">${report.recent.length?report.recent.map(entry=>{const g=byId.get(entry.gameId),winnerNames=entry.winners.map(i=>entry.players[i]).filter(Boolean);return`<div class="history-row"><span class="history-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||entry.gameId)}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${winnerNames.length?`勝者 ${winnerNames.map(esc).join(' & ')}`:'勝者なし'}</small></span><time>${formatPlayedAt(entry.at)}</time></div>`}).join(''):'<div class="catalog-empty">履歴はまだありません。</div>'}</section>`;
+  app.querySelector('#statsBack').onclick=renderHome;
+  app.querySelectorAll('.game-stat-row[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+}
+
 function renderPartySetup(){
   disposeActiveGame();const games=listGames(),ids=games.map(g=>g.id),saved=partySettings.load(ids);
   const state={rounds:saved.rounds,selected:new Set(saved.gameIds)};
@@ -257,10 +287,16 @@ function startGame(id){
 function completeRound(restart){
   renderScorebar();
   if(session.mode==='single'){
-    if(Math.max(...session.scores)>=5){disposeActiveGame();return renderWinner(false,lastSingleGameId)}
+    if(Math.max(...session.scores)>=5){
+      const winners=session.winnerIndexes(false);
+      stats.record({gameId:lastSingleGameId,mode:'single',players:[...session.players],scores:[...session.scores],winners});
+      disposeActiveGame();return renderWinner(false,lastSingleGameId);
+    }
     return restart();
   }
-  const completedGameId=session.currentPartyGame(),result=session.finishPartyRound();disposeActiveGame();
+  const completedGameId=session.currentPartyGame(),result=session.finishPartyRound();
+  stats.record({gameId:completedGameId,mode:'party',players:[...session.players],scores:[...result.awards],winners:winnerIndexesFromScores(result.awards)});
+  disposeActiveGame();
   if(result.finished)return renderWinner(true,completedGameId);
   renderPartyIntermission(false,result,false,completedGameId);
 }
