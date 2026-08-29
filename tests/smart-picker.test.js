@@ -37,12 +37,12 @@ test('smart picker uses the currently filtered candidate set',()=>{
   assert.equal(pickGame(games,{difficulty:3,maxMinutes:5},()=>0),null);
 });
 
-test('all 21 production games have explicit metadata',()=>{
-  const ids=['sync','bomb','five','minority','sniper','taboo','clock','ten','code','logic','ev','auction','grid','allocation','portfolio','sequence','frontline','priority','isolation','gate','triad'];
+test('all 24 production games have explicit metadata',()=>{
+  const ids=['sync','bomb','five','minority','sniper','taboo','clock','ten','code','logic','ev','auction','grid','allocation','portfolio','sequence','frontline','priority','isolation','gate','triad','memory','route','pattern'];
   for(const id of ids){
     const meta=gameMeta(id);
     assert.ok([1,2,3].includes(meta.difficulty),id);
     assert.ok(meta.minutes>=3&&meta.minutes<=10,id);
-    assert.ok(meta.minPlayers>=2&&meta.maxPlayers<=8&&meta.minPlayers<=meta.maxPlayers,id);
+    assert.ok(meta.minPlayers>=1&&meta.maxPlayers<=8&&meta.minPlayers<=meta.maxPlayers,id);
   }
 });
