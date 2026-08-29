@@ -13,6 +13,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - プレイテスト評価は4軸で端末内集計
 - 完了したSingle / Partyラウンドを端末内のプレイ履歴として保存
 - 1人ならSolo対応ゲーム、2〜8人ならスマホ1台を順番に回して遊ぶ
+- Party Pocketの端末データをJSONでバックアップ / 復元可能
 
 ## Games
 
@@ -53,6 +54,15 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 一度オンラインで読み込めば、基本ゲームはオフラインでも起動可能
 - 更新版Service Workerが準備できた場合はホームに更新カードを表示
 - GitHub Pagesの `/test/` 配下で動くよう相対パスのみ使用
+
+## Data Vault
+- Party Pocketが管理する `partyPocket...` localStorageキーをJSONへ書き出し
+- iPhoneではWeb Share API対応時に共有シートから「ファイルに保存」等を利用可能
+- 非対応環境ではJSONファイルとしてダウンロード
+- 復元前に形式 / バージョン / サイズ / 既知JSONデータを検証
+- 復元時はParty Pocket管理キーだけを置き換え、他のlocalStorageは触らない
+- 全初期化もParty Pocket管理キーだけが対象
+- PWA本体 / Service Worker / オフラインキャッシュは初期化対象外
 
 ## Modes
 
@@ -175,6 +185,7 @@ src/
 │  ├ health.js
 │  ├ solo.js
 │  ├ pwa.js
+│  ├ backup.js
 │  └ transport.js
 └ games/
    ├ sync.js
