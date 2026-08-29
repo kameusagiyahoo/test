@@ -169,7 +169,7 @@ function renderHome(){
   });
   app.querySelector('#applyUpdate')?.addEventListener('click',()=>{
     const waiting=pwaUpdateRegistration?.waiting;
-    if(waiting){waiting.postMessage({type:'SKIP_WAITING'});location.reload()}
+    if(waiting){toast('更新を適用します');waiting.postMessage({type:'SKIP_WAITING'})}
   });
   app.querySelector('#dailySolo')?.addEventListener('click',()=>renderGameDetail(daily.gameId));
   if(app.querySelector('.solo-progress-list'))bindGameLaunch(app.querySelector('.solo-progress-list'));
@@ -390,9 +390,10 @@ function renderWinner(isParty,ratingGameId=null){
   };
 }
 
-watchInstallPrompt(ready=>{pwaInstallReady=ready;if(document.querySelector('#app'))renderHome()});
-watchConnectivity(()=>{if(document.querySelector('#app'))renderHome()});
-registerPWA(registration=>{pwaUpdateRegistration=registration;if(document.querySelector('#app'))renderHome()});
+function refreshHomeIfVisible(){if(app.querySelector('.hero'))renderHome()}
+watchInstallPrompt(ready=>{pwaInstallReady=ready;refreshHomeIfVisible()});
+watchConnectivity(()=>refreshHomeIfVisible());
+registerPWA(registration=>{pwaUpdateRegistration=registration;refreshHomeIfVisible()});
 navigator.serviceWorker?.addEventListener?.('controllerchange',()=>location.reload());
 
 renderHome();
