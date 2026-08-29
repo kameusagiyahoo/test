@@ -1,5 +1,6 @@
 const RATING_KEY='partyPocketRatingsV1';
 const PARTY_SETTINGS_KEY='partyPocketPartySettingsV1';
+const LIBRARY_KEY='partyPocketLibraryV1';
 
 function readJson(storage,key,fallback){
   try{const raw=storage?.getItem?.(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
@@ -35,5 +36,44 @@ export class PartySettingsStore{
     const gameIds=[...new Set(Array.isArray(settings?.gameIds)?settings.gameIds:[])].filter(id=>validGameIds.includes(id));
     if(gameIds.length<2)throw new Error('select at least two games');
     const value={rounds,gameIds};this.storage?.setItem?.(PARTY_SETTINGS_KEY,JSON.stringify(value));return value;
+  }
+}
+
+export class LibraryStore{
+  constructor(storage=globalThis.localStorage){this.storage=storage}
+  state(){
+    const raw=readJson(this.storage,LIBRARY_KEY,{favorites:[],recent:[]});
+    return{
+      favorites:Array.isArray(raw?.favorites)?[...new Set(raw.favorites.filter(Boolean))]:[],
+      recent:Array.isArray(raw?.recent)?[...new Set(raw.recent.filter(Boolean))].slice(0,8):[]
+    };
+  }
+  save(value){
+    const state={
+      favorites:[...new Set(value?.favorites||[])],
+      recent:[...new Set(value?.recent||[])].slice(0,8)
+    };
+    this.storage?.setItem?.(LIBRARY_KEY,JSON.stringify(state));
+    return state;
+  }
+  isFavorite(gameId){return this.state().favorites.includes(gameId)}
+  toggleFavorite(gameId){
+    const state=this.state();
+    const favorites=state.favorites.includes(gameId)
+      ?state.favorites.filter(id=>id!==gameId)
+      :[gameId,...state.favorites];
+    return this.save({...state,favorites});
+  }
+  touchRecent(gameId){
+    const state=this.state();
+    return this.save({...state,recent:[gameId,...state.recent.filter(id=>id!==gameId)]});
+  }
+  favorites(validIds=[]){
+    const ids=this.state().favorites;
+    return validIds.length?ids.filter(id=>validIds.includes(id)):ids;
+  }
+  recent(validIds=[]){
+    const ids=this.state().recent;
+    return validIds.length?ids.filter(id=>validIds.includes(id)):ids;
   }
 }
