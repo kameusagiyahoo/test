@@ -56,3 +56,16 @@ test('saving unchanged player names does not discard a party checkpoint',()=>{
 test('answer normalization handles width, case and punctuation',()=>{
   assert.equal(normalizeAnswer(' Ａpple！ '),normalizeAnswer('apple'));assert.equal(normalizeAnswer('リンゴ。'),normalizeAnswer('リンゴ'));
 });
+
+test('session can persist one player for solo games but Party requires two',()=>{
+  const storage=memoryStorage();
+  const session=new SessionStore({storage});
+  session.savePlayers(['Solo']);
+  assert.deepEqual(session.players,['Solo']);
+  session.startSingle();
+  session.addScore(0,2);
+  assert.deepEqual(session.scores,[2]);
+  assert.throws(()=>session.startParty(['memory','route'],3,()=>0.5),/two players/);
+  const restored=new SessionStore({storage});
+  assert.deepEqual(restored.players,['Solo']);
+});

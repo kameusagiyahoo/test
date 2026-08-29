@@ -60,7 +60,7 @@ export class StatsStore{
     const gameStats=[...games.values()].map(g=>{
       const leaders=[...g.players.values()].map(p=>({...p,winRate:p.plays?p.wins/p.plays:0}))
         .sort((a,b)=>b.wins-a.wins||b.winRate-a.winRate||b.plays-a.plays||a.name.localeCompare(b.name,'ja'));
-      return{gameId:g.gameId,plays:g.plays,single:g.single,party:g.party,leader:leaders[0]||null};
+      return{gameId:g.gameId,plays:g.plays,single:g.single,party:g.party,playerCount:g.players.size,leader:leaders[0]||null};
     }).sort((a,b)=>b.plays-a.plays||a.gameId.localeCompare(b.gameId));
     return{
       totalPlays:entries.length,

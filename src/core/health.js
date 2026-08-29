@@ -41,6 +41,7 @@ export function analyzeGameHealth({gameId,playtest,stats},thresholds=HEALTH_THRE
 
   if(
     plays>=thresholds.minSkewGamePlays &&
+    Number(s.playerCount)>=2 &&
     s.leader &&
     Number(s.leader.plays)>=thresholds.minSkewPlayerPlays &&
     Number(s.leader.winRate)>=thresholds.skewWinRate

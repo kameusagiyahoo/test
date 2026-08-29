@@ -30,8 +30,8 @@ test('recent games are unique newest-first and capped at eight',()=>{
   assert.deepEqual(store.recent().slice(0,3),['e','i','h']);
 });
 
-test('all 21 production games have explicit usable guides',()=>{
-  const ids=['sync','bomb','five','minority','sniper','taboo','clock','ten','code','logic','ev','auction','grid','allocation','portfolio','sequence','frontline','priority','isolation','gate','triad'];
+test('all 24 production games have explicit usable guides',()=>{
+  const ids=['sync','bomb','five','minority','sniper','taboo','clock','ten','code','logic','ev','auction','grid','allocation','portfolio','sequence','frontline','priority','isolation','gate','triad','memory','route','pattern'];
   for(const id of ids){
     assert.equal(hasExplicitGuide(id),true,id);
     const guide=gameGuide(id);
