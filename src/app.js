@@ -8,6 +8,7 @@ import {StatsStore,winnerIndexesFromScores} from './core/stats.js';
 import {buildHealthReport} from './core/health.js';
 import {SoloProgressStore,SOLO_GAME_IDS} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
+import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -42,6 +43,7 @@ let soloRun=null;
 let lastSoloResult=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
+const APP_VERSION='8.14.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -144,6 +146,7 @@ function renderHome(){
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>24ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
   <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
+  <section class="playtest-entry data-entry"><div><div class="eyebrow">DATA VAULT</div><h3>端末データをバックアップ</h3><p>プレイヤー・履歴・評価・お気に入り・Solo進捗をJSONへ保存し、別端末でも復元できます。</p></div><button class="btn quiet" id="dataVault">管理する</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
   ${favoriteGames.length?`<div class="section-head"><h2>Favorites</h2><span class="muted">${favoriteGames.length} games</span></div><section class="library-list" id="favoriteList">${favoriteGames.map(libraryRowHtml).join('')}</section>`:''}
@@ -176,6 +179,7 @@ function renderHome(){
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
   app.querySelector('#gameHealth').onclick=renderGameHealth;
+  app.querySelector('#dataVault').onclick=renderDataVault;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
   function paintCatalog(){
@@ -291,6 +295,80 @@ function renderGameHealth(){
 
   app.querySelector('#healthBack').onclick=renderHome;
   app.querySelectorAll('.health-card-head[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+}
+
+function formatBytes(bytes){
+  const value=Number(bytes)||0;
+  if(value<1024)return value+' B';
+  if(value<1024*1024)return (value/1024).toFixed(1)+' KB';
+  return (value/(1024*1024)).toFixed(2)+' MB';
+}
+
+function formatBackupDate(value){
+  if(!value)return'日時不明';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'日時不明':date.toLocaleString('ja-JP');
+}
+
+async function exportPartyPocketBackup(){
+  const backup=createBackup(globalThis.localStorage,{appVersion:APP_VERSION}),textValue=stringifyBackup(backup);
+  const filename=backupFilename(),blob=new Blob([textValue],{type:'application/json'});
+  try{
+    const file=new File([blob],filename,{type:'application/json'});
+    if(navigator.share&&navigator.canShare?.({files:[file]})){
+      await navigator.share({files:[file],title:'Party Pocket Backup'});
+      return;
+    }
+  }catch(error){
+    if(error?.name==='AbortError')return;
+  }
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('バックアップを書き出しました');
+}
+
+function renderDataVault(){
+  disposeActiveGame();
+  updateBadge('DATA VAULT');
+  const current=createBackup(globalThis.localStorage,{appVersion:APP_VERSION}),summary=backupSummary(current);
+  let pendingBackup=null;
+
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="vaultBack">←</button><div><div class="eyebrow">DATA VAULT</div><div class="screen-title">バックアップと復元</div></div></div>
+  <section class="vault-summary"><div><b>${summary.keyCount}</b><span>保存キー</span></div><div><b>${formatBytes(summary.bytes)}</b><span>バックアップ量</span></div><div><b>v${APP_VERSION}</b><span>現在版</span></div></section>
+  <section class="panel vault-section"><div><div class="eyebrow">EXPORT</div><h3>この端末のデータを保存</h3><p>プレイヤー名、Party設定、履歴、評価、お気に入り、Solo進捗などParty PocketのlocalStorageを1つのJSONへまとめます。</p></div><button class="btn primary full" id="exportBackup">バックアップを書き出す</button></section>
+  <section class="panel vault-section"><div><div class="eyebrow">RESTORE</div><h3>バックアップから復元</h3><p>JSONを検証してから内容を表示します。復元すると、現在のParty Pocketデータはバックアップ内容で置き換わります。</p></div><input id="restoreFile" class="vault-file-input" type="file" accept=".json,application/json"><button class="btn quiet full" id="chooseBackup">バックアップを選ぶ</button><div class="restore-preview" id="restorePreview" hidden></div></section>
+  <section class="panel vault-section danger-zone"><div><div class="eyebrow">RESET</div><h3>端末データを初期化</h3><p>Party Pocketのユーザーデータだけを削除します。アプリ本体・Service Worker・オフラインキャッシュは残ります。</p></div><button class="btn danger full" id="clearData">端末データをすべて削除</button></section>
+  <div class="vault-note">端末変更やSafariのサイトデータ削除前には、先にバックアップを書き出してください。</div>`;
+
+  app.querySelector('#vaultBack').onclick=renderHome;
+  app.querySelector('#exportBackup').onclick=exportPartyPocketBackup;
+  const fileInput=app.querySelector('#restoreFile'),preview=app.querySelector('#restorePreview');
+  app.querySelector('#chooseBackup').onclick=()=>fileInput.click();
+  fileInput.onchange=async()=>{
+    pendingBackup=null;
+    const file=fileInput.files?.[0];
+    if(!file)return;
+    try{
+      const parsed=parseBackupText(await file.text()),info=backupSummary(parsed);
+      pendingBackup=parsed;
+      preview.hidden=false;
+      preview.innerHTML=`<div><div class="eyebrow">VALID BACKUP</div><b>${esc(file.name)}</b><small>作成: ${esc(formatBackupDate(info.exportedAt))}<br>App: ${esc(info.appVersion)} · ${info.keyCount} keys · ${formatBytes(info.bytes)}</small></div><button class="btn primary" id="confirmRestore">このデータを復元</button>`;
+      preview.querySelector('#confirmRestore').onclick=()=>{
+        if(!pendingBackup)return;
+        if(!confirm('現在のParty Pocketデータを、このバックアップ内容で置き換えます。続けますか？'))return;
+        try{restoreBackup(globalThis.localStorage,pendingBackup);location.reload()}
+        catch{toast('復元に失敗しました')}
+      };
+    }catch(error){
+      preview.hidden=false;
+      preview.innerHTML=`<div class="restore-error"><b>読み込めませんでした</b><small>${esc(error?.message||'バックアップ形式を確認してください')}</small></div>`;
+    }
+  };
+  app.querySelector('#clearData').onclick=()=>{
+    if(!confirm('プレイヤー、履歴、評価、Solo進捗などParty Pocketの端末データをすべて削除します。元に戻せません。続けますか？'))return;
+    clearPartyPocketData(globalThis.localStorage);location.reload();
+  };
 }
 
 function renderPartySetup(){
