@@ -39,7 +39,7 @@ test('dominance requires enough games player appearances and 75 percent win rate
   const flagged=analyzeGameHealth({
     gameId:'gate',
     playtest:playtest(),
-    stats:{plays:6,leader:{name:'A',plays:4,wins:3,winRate:.75}}
+    stats:{plays:6,playerCount:2,leader:{name:'A',plays:4,wins:3,winRate:.75}}
   });
   assert.ok(flagged.issues.some(i=>i.type==='dominance'));
   assert.equal(flagged.status,'watch');
@@ -47,7 +47,7 @@ test('dominance requires enough games player appearances and 75 percent win rate
   const small=analyzeGameHealth({
     gameId:'gate',
     playtest:playtest(),
-    stats:{plays:4,leader:{name:'A',plays:4,wins:4,winRate:1}}
+    stats:{plays:4,playerCount:2,leader:{name:'A',plays:4,wins:4,winRate:1}}
   });
   assert.ok(!small.issues.some(i=>i.type==='dominance'));
 });
@@ -79,7 +79,7 @@ test('health report sorts action before watch before data before healthy',()=>{
   const sRows=[
     {gameId:'healthy',plays:2,leader:null},
     {gameId:'data',plays:0,leader:null},
-    {gameId:'watch',plays:5,leader:{name:'A',plays:4,wins:3,winRate:.75}},
+    {gameId:'watch',plays:5,playerCount:2,leader:{name:'A',plays:4,wins:3,winRate:.75}},
     {gameId:'action',plays:2,leader:null}
   ];
   const report=buildHealthReport(ids,pRows,sRows);
@@ -88,4 +88,13 @@ test('health report sorts action before watch before data before healthy',()=>{
   assert.equal(report.watchCount,1);
   assert.equal(report.dataCount,1);
   assert.equal(report.healthyCount,1);
+});
+
+test('single-player results never trigger dominance warning',()=>{
+  const row=analyzeGameHealth({
+    gameId:'memory',
+    playtest:playtest({responses:2,fun:4,clarity:4,replay:4}),
+    stats:{plays:8,playerCount:1,leader:{name:'Solo',plays:8,wins:8,winRate:1}}
+  });
+  assert.ok(!row.issues.some(i=>i.type==='dominance'));
 });
