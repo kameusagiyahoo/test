@@ -99,12 +99,7 @@ function bindGameLaunch(container=app){
 
 function renderGameDetail(id){
   disposeActiveGame();
-  const game=getGame(id);if(!game)return watchInstallPrompt(ready=>{pwaInstallReady=ready;if(document.querySelector('#app'))renderHome()});
-watchConnectivity(()=>{if(document.querySelector('#app'))renderHome()});
-registerPWA(registration=>{pwaUpdateRegistration=registration;if(document.querySelector('#app'))renderHome()});
-navigator.serviceWorker?.addEventListener?.('controllerchange',()=>location.reload());
-
-renderHome();
+  const game=getGame(id);if(!game)return renderHome();
   const meta=gameMeta(id),guide=gameGuide(id),favorite=library.isFavorite(id);
   updateBadge('GAME GUIDE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="detailBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME GUIDE</div><div class="screen-title">${game.title}</div></div></div></div>
@@ -394,5 +389,10 @@ function renderWinner(isParty,ratingGameId=null){
     if(lastSingleGameId){session.startSingle();return startGame(lastSingleGameId)}renderHome();
   };
 }
+
+watchInstallPrompt(ready=>{pwaInstallReady=ready;if(document.querySelector('#app'))renderHome()});
+watchConnectivity(()=>{if(document.querySelector('#app'))renderHome()});
+registerPWA(registration=>{pwaUpdateRegistration=registration;if(document.querySelector('#app'))renderHome()});
+navigator.serviceWorker?.addEventListener?.('controllerchange',()=>location.reload());
 
 renderHome();
