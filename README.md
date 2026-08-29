@@ -47,6 +47,14 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 
 ## Modes
 
+### Solo Challenge
+- 1人 + Solo対応ゲームでは、5点到達までのラウンド数を記録
+- ゲーム別に最短クリアラウンド / 最長連続成功 / 完走回数をlocalStorageへ保存
+- 毎日1つのSoloゲームをDaily Challengeとして提示
+- Dailyは4ラウンド以内に5点到達でクリア
+- Daily連続クリア日数を保存
+- 結果画面に今回ラウンド数・自己ベスト・連続成功を表示
+
 ### Single Game
 1人でもSingleを利用できます。ゲームを選ぶと、まず詳細画面で目的・手順・勝ち方・具体例を確認できます。「このゲームを始める」からSingle Gameを開始し、先に5点取った人が勝利します。
 
@@ -152,6 +160,7 @@ src/
 │  ├ game-guide.js
 │  ├ stats.js
 │  ├ health.js
+│  ├ solo.js
 │  └ transport.js
 └ games/
    ├ sync.js
