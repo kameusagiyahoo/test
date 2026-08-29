@@ -5,6 +5,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 ## 方針
 
 - 公開先: GitHub Pagesのみ
+- PWA対応: ホーム画面追加 / standalone起動 / Service Workerオフラインキャッシュ
 - バックエンド: なし
 - 外部DB / Worker / WebSocket: なし
 - 複数端末同期: なし
@@ -44,6 +45,14 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - ⌗ アイソレーション — 1マス移動するたび元マスを封鎖し、相手の合法手を削る
 - ⇥ ゲートライン — 対岸への経路を維持しながら壁を置き、相手の進路を遠回りさせる
 - △ トライアド・シフト — 3駒を配置・移動し、縦・横・斜めの3連を作る
+
+## PWA / iPhone
+- `manifest.webmanifest` を追加
+- iPhone Safariでは共有 →「ホーム画面に追加」で独立アプリ風に起動
+- Service WorkerでHTML / CSS / JavaScript / 24ゲームを事前キャッシュ
+- 一度オンラインで読み込めば、基本ゲームはオフラインでも起動可能
+- 更新版Service Workerが準備できた場合はホームに更新カードを表示
+- GitHub Pagesの `/test/` 配下で動くよう相対パスのみ使用
 
 ## Modes
 
@@ -147,6 +156,10 @@ Party Modeは2人以上で利用できます。3 / 6 / 9ラウンドを選択し
 
 ```text
 index.html
+manifest.webmanifest
+sw.js
+icon.svg
+icon-maskable.svg
 styles.css
 strategy.css
 src/
@@ -161,6 +174,7 @@ src/
 │  ├ stats.js
 │  ├ health.js
 │  ├ solo.js
+│  ├ pwa.js
 │  └ transport.js
 └ games/
    ├ sync.js
