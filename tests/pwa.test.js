@@ -26,7 +26,7 @@ test('service worker precaches core PWA assets and all 24 game modules',()=>{
   const required=[
     './index.html','./styles.css','./strategy.css','./manifest.webmanifest',
     './icon.svg','./icon-maskable.svg','./src/bootstrap.js','./src/app.js',
-    './src/core/pwa.js','./src/core/backup.js','./src/core/session.js','./src/core/catalog.js',
+    './src/core/pwa.js','./src/core/backup.js','./src/core/groups.js','./src/core/session.js','./src/core/catalog.js',
     'sync','bomb','five','minority','sniper','taboo','clock','ten',
     'code','logic','ev','auction','grid','allocation','portfolio','sequence',
     'frontline','priority','isolation','gate','triad','memory','route','pattern'
@@ -38,7 +38,7 @@ test('service worker precaches core PWA assets and all 24 game modules',()=>{
 });
 
 test('service worker has navigation fallback and versioned cache',()=>{
-  assert.match(sw,/CACHE_NAME='party-pocket-v8\.14\.0'/);
+  assert.match(sw,/CACHE_NAME='party-pocket-v8\.15\.0'/);
   assert.match(sw,/request\.mode==='navigate'/);
   assert.match(sw,/caches\.match\('\.\/index\.html'\)/);
   assert.match(sw,/SKIP_WAITING/);
