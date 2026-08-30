@@ -9,6 +9,7 @@ import {buildHealthReport} from './core/health.js';
 import {SoloProgressStore,SOLO_GAME_IDS} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
 import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
+import {PlayerGroupStore,samePlayers} from './core/groups.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -32,6 +33,7 @@ const library=new LibraryStore(globalThis.localStorage);
 const playtests=new PlaytestStore(globalThis.localStorage);
 const stats=new StatsStore(globalThis.localStorage);
 const soloProgress=new SoloProgressStore(globalThis.localStorage);
+const playerGroups=new PlayerGroupStore(globalThis.localStorage);
 const app=document.querySelector('#app');
 const badge=document.querySelector('#sessionBadge');
 const homeButton=document.querySelector('#homeButton');
@@ -43,7 +45,7 @@ let soloRun=null;
 let lastSoloResult=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.14.0';
+const APP_VERSION='8.15.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -130,12 +132,14 @@ function renderHome(){
   const validIds=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
   const favoriteGames=library.favorites(validIds).map(id=>byId.get(id)).filter(Boolean);
   const recentGames=library.recent(validIds).map(id=>byId.get(id)).filter(Boolean);
+  const groups=playerGroups.recent();
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
   app.innerHTML=`<section class="hero"><div class="eyebrow hero-label">LOCAL PARTY GAMES</div><h1>ひとつのスマホで、<br>場を動かす。</h1><p>1〜8人。ひとりでも、みんなでも。準備なしで始められる短いゲームのコレクション。</p></section>
   ${resumeHtml}
-  <div class="section-head"><h2>Players</h2><span class="muted">この端末に保存</span></div>
+  <div class="section-head"><h2>Players</h2><button class="section-action" id="manageGroups">グループ管理</button></div>
+  ${groups.length?`<section class="group-list" id="savedGroups">${groups.map(group=>`<article class="group-card ${samePlayers(group.players,session.players)?'active':''}" data-group-card="${group.id}"><div class="group-card-main"><div><div class="eyebrow">${group.players.length===1?'SOLO GROUP':'PLAYER GROUP'}</div><h3>${esc(group.name)}</h3><p>${group.players.map(esc).join(' · ')}</p></div><span class="group-count">${group.players.length}人</span></div><div class="group-actions"><button class="btn quiet" data-load-group="${group.id}">呼び出す</button><button class="btn primary" data-quick-group="${group.id}">${group.players.length===1?'Quick Solo':'Quick Party 3R'}</button></div></article>`).join('')}</section>`:''}
   <section class="panel"><div id="playerList" class="stack"></div><div class="actions"><button class="btn quiet" id="addPlayer">プレイヤー追加</button><button class="btn primary" id="savePlayers">保存</button></div></section>
   <div class="section-head"><h2>Play</h2><span class="muted">おすすめは Party</span></div>
   <section class="mode-grid"><button class="mode-card featured" id="partyMode" ${session.players.length<2?'disabled':''}><div class="mode-kicker">PARTY</div><h3>${session.players.length<2?'2人以上でParty':'総合戦を組む'}</h3><p>${session.players.length<2?'1人のときは下のSingleゲームを遊べます。':'3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。'}</p><span class="text-link">${session.players.length<2?'プレイヤーを追加すると利用可能':'設定して始める →'}</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>${session.players.length===1?'1人向けゲームで自己ベストを狙えます。':'下の一覧から選択。先に5点取ったプレイヤーが勝ちです。'}</p></div></section>
@@ -160,6 +164,20 @@ function renderHome(){
   renderPlayers();
   app.querySelector('#addPlayer').onclick=()=>{if(draftPlayers.length>=8)return toast('最大8人です');draftPlayers.push(`プレイヤー${draftPlayers.length+1}`);renderPlayers()};
   app.querySelector('#savePlayers').onclick=()=>saveDraft();
+  app.querySelector('#manageGroups').onclick=()=>{saveDraft({quiet:true});renderPlayerGroups()};
+  app.querySelectorAll('[data-load-group]').forEach(button=>button.onclick=()=>{
+    const group=playerGroups.get(button.dataset.loadGroup);if(!group)return;
+    session.savePlayers(group.players);playerGroups.touch(group.id);renderHome();toast(group.name+'を呼び出しました');
+  });
+  app.querySelectorAll('[data-quick-group]').forEach(button=>button.onclick=()=>{
+    const group=playerGroups.get(button.dataset.quickGroup);if(!group)return;
+    session.savePlayers(group.players);playerGroups.touch(group.id);
+    if(group.players.length===1){
+      const gameId=soloProgress.daily().gameId;session.startSingle();return startGame(gameId);
+    }
+    const ids=listGames().map(g=>g.id),settings=partySettings.load(ids);
+    session.startParty(settings.gameIds,3);return renderPartyIntermission(true);
+  });
   app.querySelector('#partyMode').onclick=()=>{if(session.players.length<2)return toast('Partyは2人以上で遊べます');saveDraft({quiet:true});renderPartySetup()};
   app.querySelector('#installApp')?.addEventListener('click',async()=>{
     if(canPromptInstall()){
@@ -369,6 +387,34 @@ function renderDataVault(){
     if(!confirm('プレイヤー、履歴、評価、Solo進捗などParty Pocketの端末データをすべて削除します。元に戻せません。続けますか？'))return;
     clearPartyPocketData(globalThis.localStorage);location.reload();
   };
+}
+
+function renderPlayerGroups(){
+  disposeActiveGame();
+  const groups=playerGroups.recent();
+  updateBadge('PLAYER GROUPS');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="groupsBack">←</button><div><div class="eyebrow">PLAYER GROUPS</div><div class="screen-title">いつものメンバー</div></div></div>
+  <section class="panel group-save-panel"><div><div class="eyebrow">SAVE CURRENT</div><h3>現在の${session.players.length}人を保存</h3><p>${session.players.map(esc).join(' · ')}</p></div><div class="group-save-form"><input id="groupName" maxlength="24" placeholder="例: 家族 / いつもの4人"><button class="btn primary" id="saveGroup">グループ保存</button></div><div class="helper">同じ名前で保存するとメンバーを上書きします。最大8グループ。</div></section>
+  <div class="section-head"><h2>Saved Groups</h2><span class="muted">${groups.length} / 8</span></div>
+  <section class="group-manager-list">${groups.length?groups.map(group=>`<article class="group-manager-row"><div><b>${esc(group.name)}</b><small>${group.players.length}人 · ${group.players.map(esc).join(' · ')}</small></div><div class="group-manager-actions"><button class="btn quiet" data-use-group="${group.id}">呼び出す</button><button class="icon-btn danger-icon" data-delete-group="${group.id}" aria-label="${esc(group.name)}を削除">×</button></div></article>`).join(''):'<div class="catalog-empty">まだ保存グループがありません。</div>'}</section>
+  <div class="vault-note">グループ情報もData Vaultのバックアップに自動で含まれます。</div>`;
+
+  app.querySelector('#groupsBack').onclick=renderHome;
+  app.querySelector('#saveGroup').onclick=()=>{
+    const name=app.querySelector('#groupName').value.trim();
+    if(!name)return toast('グループ名を入力してください');
+    try{playerGroups.save(name,session.players);renderPlayerGroups();toast(name+'を保存しました')}
+    catch(error){toast(error?.message||'保存できませんでした')}
+  };
+  app.querySelectorAll('[data-use-group]').forEach(button=>button.onclick=()=>{
+    const group=playerGroups.get(button.dataset.useGroup);if(!group)return;
+    session.savePlayers(group.players);playerGroups.touch(group.id);renderHome();toast(group.name+'を呼び出しました');
+  });
+  app.querySelectorAll('[data-delete-group]').forEach(button=>button.onclick=()=>{
+    const group=playerGroups.get(button.dataset.deleteGroup);if(!group)return;
+    if(!confirm(group.name+'を削除しますか？'))return;
+    playerGroups.remove(group.id);renderPlayerGroups();
+  });
 }
 
 function renderPartySetup(){

@@ -14,6 +14,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 完了したSingle / Partyラウンドを端末内のプレイ履歴として保存
 - 1人ならSolo対応ゲーム、2〜8人ならスマホ1台を順番に回して遊ぶ
 - Party Pocketの端末データをJSONでバックアップ / 復元可能
+- よく使うプレイヤー構成を最大8グループ保存し、Quick Solo / Quick Partyで即開始
 
 ## Games
 
@@ -63,6 +64,15 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 復元時はParty Pocket管理キーだけを置き換え、他のlocalStorageは触らない
 - 全初期化もParty Pocket管理キーだけが対象
 - PWA本体 / Service Worker / オフラインキャッシュは初期化対象外
+
+## Player Groups / Quick Start
+- 現在の1〜8人を名前付きグループとして最大8件保存
+- 同名保存は既存グループを上書き
+- ホームから1タップでメンバー構成を呼び出し
+- 1人グループは `Quick Solo` で当日のDaily Soloを即開始
+- 2人以上のグループは `Quick Party 3R` で保存済みPartyゲーム設定を使った3ラウンド戦を即開始
+- 最近使ったグループを先に表示
+- グループ情報はData Vaultバックアップへ自動的に含まれる
 
 ## Modes
 
@@ -186,6 +196,7 @@ src/
 │  ├ solo.js
 │  ├ pwa.js
 │  ├ backup.js
+│  ├ groups.js
 │  └ transport.js
 └ games/
    ├ sync.js
