@@ -86,3 +86,12 @@ test('summary and filename expose portable metadata',()=>{
   assert.equal(summary.appVersion,'8.14.0');
   assert.match(backupFilename(new Date(2026,7,30,10,5)),/^party-pocket-backup-20260830-1005\.json$/);
 });
+
+test('saved party presets are validated and included in backups',()=>{
+  const storage=memoryStorage({
+    partyPocketSavedPartiesV1:JSON.stringify([{id:'p1',name:'定番',schedule:['code','gate']}])
+  });
+  const backup=createBackup(storage,{appVersion:'8.18.0'});
+  assert.ok(backup.data.partyPocketSavedPartiesV1);
+  assert.doesNotThrow(()=>validateBackup(backup));
+});
