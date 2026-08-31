@@ -12,7 +12,8 @@ const JSON_KEYS=new Set([
   'partyPocketLibraryV1',
   'partyPocketPlaytestV1',
   'partyPocketStatsV1',
-  'partyPocketSoloProgressV1'
+  'partyPocketSoloProgressV1',
+  'partyPocketSavedPartiesV1'
 ]);
 
 export function isManagedKey(key){
