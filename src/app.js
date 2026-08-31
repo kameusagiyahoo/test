@@ -10,7 +10,7 @@ import {SoloProgressStore,SOLO_GAME_IDS} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
 import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {PlayerGroupStore,samePlayers} from './core/groups.js';
-import {buildSmartParty,recentGameIdsForPlayers,summarizeSmartParty} from './core/recommender.js';
+import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -46,33 +46,35 @@ let soloRun=null;
 let lastSoloResult=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.16.0';
+const APP_VERSION='8.17.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function pwaStatusLabel(){return isStandalone()?'APP':isOnline()?'ONLINE':'OFFLINE'}
-function smartPartyPlan(rounds,{players=session.players,allowedGameIds=null}={}){
+function smartPartyInputs(players=session.players,allowedGameIds=null){
   const games=listGames(),ids=games.map(g=>g.id),pRows=playtests.report(ids),sReport=stats.report(ids);
   const health=buildHealthReport(ids,pRows,sReport.gameStats);
-  const recentIds=recentGameIdsForPlayers(stats.history(),players,8);
-  return buildSmartParty(games,{
-    playerCount:players.length,
-    rounds,
-    favoriteIds:library.favorites(ids),
-    recentIds,
-    playtestRows:pRows,
-    healthRows:health.games,
-    allowedGameIds
-  });
+  return{
+    games,
+    options:{
+      playerCount:players.length,
+      favoriteIds:library.favorites(ids),
+      recentIds:recentGameIdsForPlayers(stats.history(),players,8),
+      playtestRows:pRows,
+      healthRows:health.games,
+      allowedGameIds
+    }
+  };
+}
+function smartPartyPlan(rounds,{players=session.players,allowedGameIds=null}={}){
+  const {games,options}=smartPartyInputs(players,allowedGameIds);
+  return buildSmartParty(games,{...options,rounds});
 }
 function startSmartParty(rounds,{players=session.players,allowedGameIds=null}={}){
   if(players.length<2)return toast('Smart Partyは2人以上で遊べます');
   if(!samePlayers(players,session.players))session.savePlayers(players);
-  const plan=smartPartyPlan(rounds,{players,allowedGameIds});
-  if(plan.length<2)return toast('Smart Partyを組めませんでした');
-  session.startParty(plan.map(g=>g.id),plan.length);
-  renderPartyIntermission(true);
+  renderSmartPartyPreview(rounds,{players:[...players],allowedGameIds});
 }
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
 function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
