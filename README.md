@@ -15,6 +15,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 1人ならSolo対応ゲーム、2〜8人ならスマホ1台を順番に回して遊ぶ
 - Party Pocketの端末データをJSONでバックアップ / 復元可能
 - よく使うプレイヤー構成を最大8グループ保存し、Quick Solo / Quick Partyで即開始
+- Smart Party Builderが人数・履歴・評価から3/6/9ラウンドを自動構成
 
 ## Games
 
@@ -73,6 +74,18 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 2人以上のグループは `Quick Party 3R` で保存済みPartyゲーム設定を使った3ラウンド戦を即開始
 - 最近使ったグループを先に表示
 - グループ情報はData Vaultバックアップへ自動的に含まれる
+
+## Smart Party Builder
+- 人数のおすすめ範囲を最優先で加点
+- お気に入り / 高いPlaytest品質 / 健全なGame Healthを加点
+- 同じメンバーで最近遊んだゲームを減点
+- Game Healthの改善優先ゲームは強く減点し、要観察も軽く減点
+- 選出済みゲームとカテゴリが被りすぎないよう多様性ボーナス
+- 難易度も同じものだけに寄りすぎないよう軽く分散
+- ホームからSmart 3R / 6R / 9Rを即開始
+- Player GroupのQuick Party 3RもSmart構成を利用
+- Party Setupの「Smart構成」で自動選択後に手動調整可能
+- Game Catalogの検索・カテゴリ・難易度・時間条件からSmart Partyを作成可能
 
 ## Modes
 
@@ -197,6 +210,7 @@ src/
 │  ├ pwa.js
 │  ├ backup.js
 │  ├ groups.js
+│  ├ recommender.js
 │  └ transport.js
 └ games/
    ├ sync.js
