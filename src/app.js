@@ -252,7 +252,10 @@ function renderHome(){
     if(plan.length<2)return toast('この条件ではPartyを組めません');
     const info=summarizeSmartParty(plan),box=app.querySelector('#pickerResult');
     box.hidden=false;
-    box.innerHTML=`<div><div class="eyebrow">SMART PARTY</div><b>§{plan.map(g=>g.emoji+' '+g.title).join(' · ')}</b><small>§{plan.length}R · 約§{info.totalMinutes}分 · 条件内から自動構成</small></div><button class="btn primary" id="startFilteredParty">これで開始</button>`.replaceAll('§','
+    box.innerHTML=`<div><div class="eyebrow">SMART PARTY</div><b>${plan.map(g=>g.emoji+' '+g.title).join(' · ')}</b><small>${plan.length}R · 約${info.totalMinutes}分 · 条件内から自動構成</small></div><button class="btn primary" id="startFilteredParty">これで開始</button>`;
+    box.querySelector('#startFilteredParty').onclick=()=>{session.startParty(plan.map(g=>g.id),plan.length);renderPartyIntermission(true)};
+  };
+  app.querySelector('#pickOne').onclick=()=>{
     const picked=pickGame(games,catalogState),box=app.querySelector('#pickerResult');
     if(!picked){box.hidden=true;return toast('この条件に合うゲームがありません')}
     const meta=gameMeta(picked.id);
