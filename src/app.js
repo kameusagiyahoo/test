@@ -11,6 +11,7 @@ import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,
 import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {PlayerGroupStore,samePlayers} from './core/groups.js';
 import {SavedPartyStore} from './core/party-presets.js';
+import {PartyHistoryStore,partyLeadChanges,partyMvp} from './core/party-history.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -37,6 +38,7 @@ const stats=new StatsStore(globalThis.localStorage);
 const soloProgress=new SoloProgressStore(globalThis.localStorage);
 const playerGroups=new PlayerGroupStore(globalThis.localStorage);
 const savedParties=new SavedPartyStore(globalThis.localStorage);
+const partyHistory=new PartyHistoryStore(globalThis.localStorage);
 const app=document.querySelector('#app');
 const badge=document.querySelector('#sessionBadge');
 const homeButton=document.querySelector('#homeButton');
@@ -46,9 +48,10 @@ let activeCleanup=null;
 let lastSingleGameId=null;
 let soloRun=null;
 let lastSoloResult=null;
+let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.18.0';
+const APP_VERSION='8.19.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -77,6 +80,16 @@ function startSmartParty(rounds,{players=session.players,allowedGameIds=null}={}
   if(players.length<2)return toast('Smart Partyは2人以上で遊べます');
   if(!samePlayers(players,session.players))session.savePlayers(players);
   renderSmartPartyPreview(rounds,{players:[...players],allowedGameIds});
+}
+function startTrackedParty(gameIds,totalRounds){
+  session.startParty(gameIds,totalRounds);
+  partyHistory.begin({players:[...session.players],schedule:[...session.party.schedule]});
+  lastPartyRecap=null;
+}
+function startTrackedSchedule(schedule){
+  session.startPartySchedule(schedule);
+  partyHistory.begin({players:[...session.players],schedule:[...session.party.schedule]});
+  lastPartyRecap=null;
 }
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
 function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
@@ -161,6 +174,7 @@ function renderHome(){
   const recentGames=library.recent(validIds).map(id=>byId.get(id)).filter(Boolean);
   const groups=playerGroups.recent();
   const partyPresets=savedParties.recent(validIds);
+  const recentParties=partyHistory.history(validIds).slice(0,3);
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
@@ -173,6 +187,7 @@ function renderHome(){
   <section class="mode-grid"><button class="mode-card featured" id="partyMode" ${session.players.length<2?'disabled':''}><div class="mode-kicker">PARTY</div><h3>${session.players.length<2?'2人以上でParty':'総合戦を組む'}</h3><p>${session.players.length<2?'1人のときは下のSingleゲームを遊べます。':'3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。'}</p><span class="text-link">${session.players.length<2?'プレイヤーを追加すると利用可能':'手動で設定 →'}</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>${session.players.length===1?'1人向けゲームで自己ベストを狙えます。':'下の一覧から選択。先に5点取ったプレイヤーが勝ちです。'}</p></div></section>
   ${session.players.length>=2?`<section class="smart-party-home"><div><div class="eyebrow">SMART PARTY</div><h3>この${session.players.length}人に合わせて自動構成</h3><p>最近遊んだゲームを避け、人数・お気に入り・評価・Game Health・カテゴリの偏りを見て組みます。</p></div><div class="smart-round-buttons">${[3,6,9].map(n=>`<button class="btn ${n===3?'primary':'quiet'}" data-smart-rounds="${n}">${n}R</button>`).join('')}</div></section>`:''}
   ${partyPresets.length?`<div class="section-head"><h2>Saved Parties</h2><button class="section-action" id="manageSavedParties">管理</button></div><section class="saved-party-list">${partyPresets.map(preset=>{const games=preset.schedule.map(id=>byId.get(id)).filter(Boolean),info=summarizeSmartParty(games);return`<article class="saved-party-card"><div><div class="eyebrow">FIXED ORDER</div><h3>${esc(preset.name)}</h3><p>${games.map(g=>g.emoji+' '+g.title).join(' → ')}</p><small>${preset.schedule.length}R · 約${info.totalMinutes}分</small></div><button class="btn primary" data-start-saved-party="${preset.id}">同じ順番で開始</button></article>`}).join('')}</section>`:''}
+  ${recentParties.length?`<div class="section-head"><h2>Recent Parties</h2><button class="section-action" id="partyHistory">履歴を見る</button></div><section class="party-history-home">${recentParties.map(entry=>{const winners=entry.winners.map(i=>entry.players[i]).filter(Boolean),games=entry.schedule.map(id=>byId.get(id)).filter(Boolean);return`<button class="party-history-home-row" data-party-history="${entry.id}"><span><b>${winners.length?winners.map(esc).join(' & ')+' 勝利':'Party結果'}</b><small>${entry.players.map(esc).join(' · ')} · ${entry.schedule.length}R</small><small>${games.slice(0,4).map(g=>g.emoji).join(' ')}${games.length>4?' …':''}</small></span><span class="recommend-arrow">→</span></button>`}).join('')}</section>`:''}
   ${!isStandalone()?`<section class="install-card"><div><div class="eyebrow">INSTALL</div><h3>ホーム画面から起動する</h3><p>${isIOS()?'Safariの共有ボタン →「ホーム画面に追加」で、アプリのように独立起動できます。':'対応ブラウザではParty Pocketを端末へインストールできます。'}</p></div><button class="btn quiet" id="installApp">${pwaInstallReady&&canPromptInstall()?'インストール':'追加方法'}</button></section>`:''}
   ${!isOnline()?'<div class="offline-banner">OFFLINE · キャッシュ済みゲームはそのまま遊べます</div>':''}
   ${pwaUpdateRegistration?'<section class="update-card"><div><div class="eyebrow">UPDATE READY</div><b>新しいParty Pocketがあります</b></div><button class="btn primary" id="applyUpdate">更新する</button></section>':''}
@@ -210,7 +225,9 @@ function renderHome(){
   app.querySelector('#partyMode').onclick=()=>{if(session.players.length<2)return toast('Partyは2人以上で遊べます');saveDraft({quiet:true});renderPartySetup()};
   app.querySelectorAll('[data-smart-rounds]').forEach(button=>button.onclick=()=>{saveDraft({quiet:true});startSmartParty(+button.dataset.smartRounds)});
   app.querySelector('#manageSavedParties')?.addEventListener('click',renderSavedParties);
-  app.querySelectorAll('[data-start-saved-party]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.startSavedParty,validIds);if(!preset)return;savedParties.touch(preset.id);session.startPartySchedule(preset.schedule);renderPartyIntermission(true)});
+  app.querySelector('#partyHistory')?.addEventListener('click',renderPartyHistory);
+  app.querySelectorAll('[data-party-history]').forEach(button=>button.onclick=()=>renderPartyHistoryDetail(button.dataset.partyHistory));
+  app.querySelectorAll('[data-start-saved-party]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.startSavedParty,validIds);if(!preset)return;savedParties.touch(preset.id);startTrackedSchedule(preset.schedule);renderPartyIntermission(true)});
   app.querySelector('#installApp')?.addEventListener('click',async()=>{
     if(canPromptInstall()){
       const accepted=await requestInstall();
@@ -271,7 +288,7 @@ function renderHome(){
   if(app.querySelector('#recentList'))bindGameLaunch(app.querySelector('#recentList'));
   paintCatalog();
   app.querySelector('#resumeParty')?.addEventListener('click',()=>{if(session.resumeParty()){draftPlayers=[...session.players];renderPartyIntermission(false,null,true)}});
-  app.querySelector('#discardParty')?.addEventListener('click',()=>{session.clearSavedParty();renderHome()});
+  app.querySelector('#discardParty')?.addEventListener('click',()=>{session.clearSavedParty();partyHistory.abandon();renderHome()});
 }
 
 function playtestStatus(row){
@@ -456,6 +473,42 @@ function renderPlayerGroups(){
   });
 }
 
+function formatPartyDate(value){
+  const date=new Date(value);if(Number.isNaN(date.getTime()))return'日時不明';
+  return date.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function partyRecapHtml(entry,{compact=false}={}){
+  if(!entry)return'';
+  const games=new Map(listGames().map(g=>[g.id,g])),mvp=partyMvp(entry),leadChanges=partyLeadChanges(entry);
+  const ranking=rankScores(entry.finalScores);
+  return `<section class="party-recap ${compact?'compact':''}"><div class="party-recap-head"><div><div class="eyebrow">PARTY RECAP</div><b>${entry.rounds.length}/${entry.schedule.length} rounds recorded</b></div><div class="party-recap-facts"><span>MVP ${mvp?mvp.names.map(esc).join(' & '):'—'}</span><span>首位交代 ${leadChanges}回</span></div></div><div class="party-recap-ranking">${ranking.map(row=>`<div><span>${row.rank}. ${esc(entry.players[row.index])}</span><b>${row.score} pt</b></div>`).join('')}</div><div class="party-recap-rounds">${entry.rounds.map((round,index)=>{const game=games.get(round.gameId),winnerNames=round.winners.map(i=>entry.players[i]).filter(Boolean);return`<div class="party-recap-round"><span class="smart-order">${String(index+1).padStart(2,'0')}</span><span><b>${game?.emoji||''} ${esc(game?.title||round.gameId)}</b><small>${winnerNames.length?`勝者 ${winnerNames.map(esc).join(' & ')}`:'勝者なし'} · ${round.awards.map((v,i)=>v>0?`${esc(entry.players[i])} +${v}`:null).filter(Boolean).join(' / ')||'Party pt なし'}</small></span></div>`}).join('')}</div></section>`;
+}
+
+function renderPartyHistory(){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id),entries=partyHistory.history(ids);
+  updateBadge('PARTY HISTORY');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="historyBack">←</button><div><div class="eyebrow">PARTY HISTORY</div><div class="screen-title">完了したParty</div></div></div><section class="lab-summary"><div><b>${entries.length}</b><span>保存Party</span></div><div><b>${entries.reduce((sum,e)=>sum+e.rounds.length,0)}</b><span>記録ラウンド</span></div><div><b>${new Set(entries.flatMap(e=>e.players)).size}</b><span>players</span></div></section><div class="lab-note">完走したPartyだけを最大50件保存します。途中離脱は完了履歴には入りません。</div><section class="party-history-list">${entries.length?entries.map(entry=>{const winners=entry.winners.map(i=>entry.players[i]).filter(Boolean);return`<button class="party-history-row" data-history-id="${entry.id}"><span><b>${winners.length?`${winners.map(esc).join(' & ')} 勝利`:'Party結果'}</b><small>${formatPartyDate(entry.completedAt)} · ${entry.players.map(esc).join(' · ')}</small><small>${entry.schedule.length}R · ${entry.finalScores.map((v,i)=>`${esc(entry.players[i])} ${v}`).join(' / ')}</small></span><span class="recommend-arrow">→</span></button>`}).join(''):'<div class="catalog-empty">完了したPartyはまだありません。</div>'}</section>`;
+  app.querySelector('#historyBack').onclick=renderHome;
+  app.querySelectorAll('[data-history-id]').forEach(button=>button.onclick=()=>renderPartyHistoryDetail(button.dataset.historyId));
+}
+
+function renderPartyHistoryDetail(id){
+  disposeActiveGame();
+  const games=listGames(),validIds=games.map(g=>g.id),entry=partyHistory.get(id,validIds);
+  if(!entry)return renderPartyHistory();
+  updateBadge('PARTY RECAP');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="recapBack">←</button><div><div class="eyebrow">PARTY RECAP</div><div class="screen-title">${formatPartyDate(entry.completedAt)}</div></div></div>${partyRecapHtml(entry)}<section class="panel recap-actions"><div><div class="eyebrow">REPLAY</div><p>${entry.schedule.length}ラウンドを同じ順番で再現できます。</p></div><div class="actions"><button class="btn quiet" id="saveHistoryPreset">Saved Partyに保存</button><button class="btn primary" id="replayHistory">同じ構成で再戦</button></div></section>`;
+  app.querySelector('#recapBack').onclick=renderPartyHistory;
+  app.querySelector('#replayHistory').onclick=()=>{startTrackedSchedule(entry.schedule);renderPartyIntermission(true)};
+  app.querySelector('#saveHistoryPreset').onclick=()=>{
+    const defaultName='Party '+formatPartyDate(entry.completedAt).replace(/[/:]/g,'-');
+    const name=prompt('Saved Party名',defaultName);if(!name?.trim())return;
+    try{savedParties.save(name.trim(),entry.schedule);toast('Saved Partyに保存しました')}catch(error){toast(error?.message||'保存できませんでした')}
+  };
+}
+
 function renderSavedParties(){
   disposeActiveGame();
   const games=listGames(),validIds=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
@@ -466,7 +519,7 @@ function renderSavedParties(){
   <section class="saved-party-manager">${presets.length?presets.map(preset=>{const rows=preset.schedule.map(id=>byId.get(id)).filter(Boolean),info=summarizeSmartParty(rows);return`<article class="saved-party-manager-row"><div><b>${esc(preset.name)}</b><small>${rows.map(g=>g.emoji+' '+g.title).join(' → ')}</small><small>${preset.schedule.length}R · 約${info.totalMinutes}分</small></div><div class="saved-party-manager-actions"><button class="btn primary" data-run-preset="${preset.id}">開始</button><button class="icon-btn danger-icon" data-delete-preset="${preset.id}" aria-label="${esc(preset.name)}を削除">×</button></div></article>`}).join(''):'<div class="catalog-empty">保存したParty構成はまだありません。</div>'}</section>
   <div class="vault-note">Party終了画面から最大8件まで保存できます。Data Vaultのバックアップにも含まれます。</div>`;
   app.querySelector('#savedPartyBack').onclick=renderHome;
-  app.querySelectorAll('[data-run-preset]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.runPreset,validIds);if(!preset)return;savedParties.touch(preset.id);session.startPartySchedule(preset.schedule);renderPartyIntermission(true)});
+  app.querySelectorAll('[data-run-preset]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.runPreset,validIds);if(!preset)return;savedParties.touch(preset.id);startTrackedSchedule(preset.schedule);renderPartyIntermission(true)});
   app.querySelectorAll('[data-delete-preset]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.deletePreset,validIds);if(!preset)return;if(!confirm(preset.name+'を削除しますか？'))return;savedParties.remove(preset.id);renderSavedParties()});
 }
 
@@ -536,7 +589,7 @@ function renderSmartPartyPreview(rounds,{players=session.players,allowedGameIds=
       paint();
     };
     app.querySelector('#confirmSmart').onclick=()=>{
-      session.startPartySchedule(state.plan.map(g=>g.id));
+      startTrackedSchedule(state.plan.map(g=>g.id));
       renderPartyIntermission(true);
     };
   }
@@ -573,7 +626,7 @@ function renderPartySetup(){
     app.querySelector('#startParty').onclick=()=>{
       if(state.selected.size<2)return toast('2ゲーム以上を選択してください');
       const selected=games.map(g=>g.id).filter(id=>state.selected.has(id));partySettings.save({rounds:state.rounds,gameIds:selected},ids);
-      session.startParty(selected,state.rounds);renderPartyIntermission(true);
+      startTrackedParty(selected,state.rounds);renderPartyIntermission(true);
     };
   }
   paint();
@@ -615,9 +668,22 @@ function completeRound(restart){
     return restart();
   }
   const completedGameId=session.currentPartyGame(),result=session.finishPartyRound();
-  stats.record({gameId:completedGameId,mode:'party',players:[...session.players],scores:[...result.awards],winners:winnerIndexesFromScores(result.awards)});
+  const roundWinners=winnerIndexesFromScores(result.awards);
+  stats.record({gameId:completedGameId,mode:'party',players:[...session.players],scores:[...result.awards],winners:roundWinners});
+  partyHistory.recordRound({
+    players:[...session.players],
+    schedule:[...session.party.schedule],
+    gameId:completedGameId,
+    gameScores:[...result.gameScores],
+    awards:[...result.awards],
+    cumulativeScores:[...session.partyScores],
+    winners:roundWinners
+  });
   disposeActiveGame();
-  if(result.finished)return renderWinner(true,completedGameId);
+  if(result.finished){
+    lastPartyRecap=partyHistory.complete({finalScores:[...session.partyScores],winners:session.winnerIndexes(true)});
+    return renderWinner(true,completedGameId);
+  }
   renderPartyIntermission(false,result,false,completedGameId);
 }
 
@@ -635,13 +701,14 @@ function renderWinner(isParty,ratingGameId=null){
   const completedSchedule=isParty?[...session.party.schedule]:[];
   updateBadge('RESULT');
   const soloResultHtml=!isParty&&lastSoloResult&&lastSoloResult.gameId===ratingGameId?`<section class="solo-result-card"><div class="eyebrow">SOLO RESULT</div><div class="solo-result-grid"><div><b>${lastSoloResult.rounds}</b><span>クリアラウンド</span></div><div><b>${lastSoloResult.game.bestRounds??'—'}</b><span>自己ベスト</span></div><div><b>${lastSoloResult.maxStreak}</b><span>連続成功</span></div></div>${lastSoloResult.daily.gameId===ratingGameId&&lastSoloResult.daily.cleared?`<div class="solo-daily-clear">DAILY CLEAR · ${lastSoloResult.daily.streak}日連続</div>`:''}</section>`:'';
+  const recapHtml=isParty&&lastPartyRecap?partyRecapHtml(lastPartyRecap,{compact:true}):'';
   const savePartyHtml=isParty?`<section class="party-save-card"><div><div class="eyebrow">SAVE THIS PARTY</div><b>この${completedSchedule.length}ラウンド構成を保存</b><small>ゲーム順もそのまま保存します。</small></div><div class="party-save-form"><input id="partyPresetName" maxlength="32" placeholder="例: 定番3本 / 頭脳戦ベスト"><button class="btn quiet" id="savePartyPreset">構成を保存</button></div></section>`:'';
-  app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${savePartyHtml}${soloResultHtml}${ratingGameId?playtestPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
+  app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${recapHtml}${savePartyHtml}${soloResultHtml}${ratingGameId?playtestPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
   if(ratingGameId)bindPlaytest(ratingGameId);
   app.querySelector('#savePartyPreset')?.addEventListener('click',()=>{const name=app.querySelector('#partyPresetName').value.trim();if(!name)return toast('構成名を入力してください');try{savedParties.save(name,completedSchedule);toast(name+'を保存しました');app.querySelector('#savePartyPreset').textContent='保存済み'}catch(error){toast(error?.message||'保存できませんでした')}});
   app.querySelector('#homeResult').onclick=renderHome;
   app.querySelector('#againResult').onclick=()=>{
-    if(isParty){session.startPartySchedule(completedSchedule);return renderPartyIntermission(true)}
+    if(isParty){startTrackedSchedule(completedSchedule);return renderPartyIntermission(true)}
     if(lastSingleGameId){session.startSingle();return startGame(lastSingleGameId)}renderHome();
   };
 }

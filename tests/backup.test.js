@@ -95,3 +95,14 @@ test('saved party presets are validated and included in backups',()=>{
   assert.ok(backup.data.partyPocketSavedPartiesV1);
   assert.doesNotThrow(()=>validateBackup(backup));
 });
+
+test('active and completed party history are included in Data Vault backup',()=>{
+  const storage=memoryStorage({
+    partyPocketPartyHistoryV1:JSON.stringify([{id:'p1',players:['A','B'],schedule:['code','gate'],rounds:[],finalScores:[3,2],winners:[0],startedAt:1,completedAt:2}]),
+    partyPocketPartyActiveV1:JSON.stringify({id:'active',players:['A','B'],schedule:['bomb','clock'],rounds:[],finalScores:[0,0],winners:[],startedAt:3,completedAt:0})
+  });
+  const backup=createBackup(storage,{appVersion:'8.19.0'});
+  assert.ok(backup.data.partyPocketPartyHistoryV1);
+  assert.ok(backup.data.partyPocketPartyActiveV1);
+  assert.doesNotThrow(()=>validateBackup(backup));
+});

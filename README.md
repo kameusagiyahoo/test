@@ -17,6 +17,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - よく使うプレイヤー構成を最大8グループ保存し、Quick Solo / Quick Partyで即開始
 - Smart Party Builderが人数・履歴・評価から3/6/9ラウンドを自動構成
 - 気に入ったParty構成をゲーム順ごと最大8件保存して再利用
+- 完了PartyをRecap付きで最大50件保存し、ラウンドごとの勝者と得点推移を確認
 
 ## Games
 
@@ -101,6 +102,19 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Party完了画面の「もう一度」も直前の順番をそのまま再現
 - Smart Party Previewの確定後もPreview表示順をそのまま実行
 - Data Vaultバックアップへ自動的に含まれる
+
+## Party Recap / History
+- Party開始時に進行中RecapをlocalStorageへ保存
+- 各ラウンド終了時にゲーム / 生スコア / Party pt / 累積Party pt / 勝者を記録
+- 完走したPartyだけを最大50件のHistoryへ確定保存
+- 途中離脱や破棄は完了履歴へ入れない
+- Party終了画面に全ラウンドのRecapを表示
+- MVP = ラウンド勝利数が最も多いプレイヤー
+- 首位交代回数を算出
+- Homeに直近3件のRecent Partiesを表示
+- Party History一覧 → 詳細Recapを表示
+- 過去履歴から同じ構成で再戦 / Saved Partyへ保存可能
+- Data Vaultバックアップへ進行中・完了履歴とも自動的に含まれる
 
 ## Modes
 
@@ -227,6 +241,7 @@ src/
 │  ├ groups.js
 │  ├ recommender.js
 │  ├ party-presets.js
+│  ├ party-history.js
 │  └ transport.js
 └ games/
    ├ sync.js
