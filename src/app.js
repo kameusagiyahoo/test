@@ -250,12 +250,7 @@ function renderHome(){
     const allowed=filterGames(games,catalogState).map(g=>g.id);
     if(allowed.length<2)return toast('この条件ではPartyを組めません');
     const rounds=Math.min(6,Math.max(3,allowed.length));
-    const plan=smartPartyPlan(rounds,{allowedGameIds:allowed});
-    if(plan.length<2)return toast('この条件ではPartyを組めません');
-    const info=summarizeSmartParty(plan),box=app.querySelector('#pickerResult');
-    box.hidden=false;
-    box.innerHTML=`<div><div class="eyebrow">SMART PARTY</div><b>${plan.map(g=>g.emoji+' '+g.title).join(' · ')}</b><small>${plan.length}R · 約${info.totalMinutes}分 · 条件内から自動構成</small></div><button class="btn primary" id="startFilteredParty">これで開始</button>`;
-    box.querySelector('#startFilteredParty').onclick=()=>{session.startParty(plan.map(g=>g.id),plan.length);renderPartyIntermission(true)};
+    renderSmartPartyPreview(rounds,{allowedGameIds:allowed});
   };
   app.querySelector('#pickOne').onclick=()=>{
     const picked=pickGame(games,catalogState),box=app.querySelector('#pickerResult');
@@ -453,6 +448,80 @@ function renderPlayerGroups(){
     if(!confirm(group.name+'を削除しますか？'))return;
     playerGroups.remove(group.id);renderPlayerGroups();
   });
+}
+
+function renderSmartPartyPreview(rounds,{players=session.players,allowedGameIds=null}={}){
+  disposeActiveGame();
+  if(players.length<2)return renderHome();
+  if(!samePlayers(players,session.players))session.savePlayers(players);
+
+  const {games,options}=smartPartyInputs(players,allowedGameIds);
+  const byId=new Map(games.map(g=>[g.id,g]));
+  const initial=buildSmartParty(games,{...options,rounds});
+  if(initial.length<2){toast('Smart Partyを組めませんでした');return renderHome()}
+
+  const state={plan:initial,locked:new Set()};
+
+  function paint(){
+    const info=summarizeSmartParty(state.plan);
+    updateBadge('SMART PARTY');
+    app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="smartBack">←</button><div><div class="eyebrow">SMART PARTY PREVIEW</div><div class="screen-title">${state.plan.length}ラウンドを確認</div></div></div>
+    <section class="smart-preview-summary"><div><b>${state.plan.length}</b><span>rounds</span></div><div><b>約${info.totalMinutes}</b><span>minutes</span></div><div><b>${info.categories.length}</b><span>categories</span></div></section>
+    <div class="lab-note">Lockしたゲームは「全部組み直す」でも残ります。↑↓で実際のプレイ順を変更できます。</div>
+    <section class="smart-preview-list">${state.plan.map((game,index)=>{
+      const meta=gameMeta(game.id);
+      const rawReasons=smartPartyReasons(game,options).filter(reason=>reason!=='最近プレイ済み');
+      const reasons=rawReasons.length?rawReasons:['全体バランス'];
+      return`<article class="smart-preview-row ${state.locked.has(game.id)?'locked':''}">
+        <div class="smart-order">${String(index+1).padStart(2,'0')}</div>
+        <div class="smart-preview-main"><div class="smart-preview-title"><span>${game.emoji}</span><b>${esc(game.title)}</b></div><small>${difficultyLabel(meta.difficulty)} · 約${meta.minutes}分 · ${playerRangeLabel(meta)}推奨</small><div class="smart-reasons">${reasons.slice(0,3).map(reason=>`<span>${esc(reason)}</span>`).join('')}</div></div>
+        <div class="smart-preview-actions"><button class="mini-btn" data-move-up="${game.id}" ${index===0?'disabled':''}>↑</button><button class="mini-btn" data-move-down="${game.id}" ${index===state.plan.length-1?'disabled':''}>↓</button><button class="mini-btn ${state.locked.has(game.id)?'active':''}" data-lock-game="${game.id}">${state.locked.has(game.id)?'LOCKED':'LOCK'}</button><button class="mini-btn" data-reroll-game="${game.id}" ${state.locked.has(game.id)?'disabled':''}>入替</button></div>
+      </article>`;
+    }).join('')}</section>
+    <section class="smart-preview-footer"><div class="smart-preview-categories">${info.categories.map(id=>`<span>${esc(categoryLabel(id))}</span>`).join('')}</div><div class="smart-preview-buttons"><button class="btn quiet" id="rebuildSmart" ${state.locked.size===state.plan.length?'disabled':''}>全部組み直す</button><button class="btn primary" id="confirmSmart">この順番で開始</button></div></section>`;
+
+    app.querySelector('#smartBack').onclick=renderHome;
+    app.querySelectorAll('[data-lock-game]').forEach(button=>button.onclick=()=>{
+      const id=button.dataset.lockGame;
+      state.locked.has(id)?state.locked.delete(id):state.locked.add(id);
+      paint();
+    });
+    app.querySelectorAll('[data-move-up]').forEach(button=>button.onclick=()=>{
+      const index=state.plan.findIndex(g=>g.id===button.dataset.moveUp);
+      if(index<=0)return;
+      [state.plan[index-1],state.plan[index]]=[state.plan[index],state.plan[index-1]];
+      paint();
+    });
+    app.querySelectorAll('[data-move-down]').forEach(button=>button.onclick=()=>{
+      const index=state.plan.findIndex(g=>g.id===button.dataset.moveDown);
+      if(index<0||index>=state.plan.length-1)return;
+      [state.plan[index+1],state.plan[index]]=[state.plan[index],state.plan[index+1]];
+      paint();
+    });
+    app.querySelectorAll('[data-reroll-game]').forEach(button=>button.onclick=()=>{
+      const id=button.dataset.rerollGame;
+      if(state.locked.has(id))return;
+      const replacement=replaceSmartPartyGame(games,state.plan.map(g=>g.id),id,options);
+      if(!replacement)return toast('これ以上候補がありません');
+      const index=state.plan.findIndex(g=>g.id===id);
+      state.plan[index]=replacement;
+      paint();
+    });
+    app.querySelector('#rebuildSmart').onclick=()=>{
+      const lockedIds=state.plan.filter(g=>state.locked.has(g.id)).map(g=>g.id);
+      const rebuilt=buildSmartPartyWithLocks(games,{...options,rounds:state.plan.length,lockedIds});
+      const unlocked=rebuilt.filter(g=>!state.locked.has(g.id));
+      let cursor=0;
+      state.plan=state.plan.map(game=>state.locked.has(game.id)?game:unlocked[cursor++]).filter(Boolean);
+      paint();
+    };
+    app.querySelector('#confirmSmart').onclick=()=>{
+      session.startParty(state.plan.map(g=>g.id),state.plan.length);
+      renderPartyIntermission(true);
+    };
+  }
+
+  paint();
 }
 
 function renderPartySetup(){
