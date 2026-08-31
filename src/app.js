@@ -10,6 +10,7 @@ import {SoloProgressStore,SOLO_GAME_IDS} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
 import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {PlayerGroupStore,samePlayers} from './core/groups.js';
+import {buildSmartParty,recentGameIdsForPlayers,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
 import {fiveGame} from './games/five.js';
@@ -45,12 +46,34 @@ let soloRun=null;
 let lastSoloResult=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.15.0';
+const APP_VERSION='8.16.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function pwaStatusLabel(){return isStandalone()?'APP':isOnline()?'ONLINE':'OFFLINE'}
+function smartPartyPlan(rounds,{players=session.players,allowedGameIds=null}={}){
+  const games=listGames(),ids=games.map(g=>g.id),pRows=playtests.report(ids),sReport=stats.report(ids);
+  const health=buildHealthReport(ids,pRows,sReport.gameStats);
+  const recentIds=recentGameIdsForPlayers(stats.history(),players,8);
+  return buildSmartParty(games,{
+    playerCount:players.length,
+    rounds,
+    favoriteIds:library.favorites(ids),
+    recentIds,
+    playtestRows:pRows,
+    healthRows:health.games,
+    allowedGameIds
+  });
+}
+function startSmartParty(rounds,{players=session.players,allowedGameIds=null}={}){
+  if(players.length<2)return toast('Smart Partyは2人以上で遊べます');
+  if(!samePlayers(players,session.players))session.savePlayers(players);
+  const plan=smartPartyPlan(rounds,{players,allowedGameIds});
+  if(plan.length<2)return toast('Smart Partyを組めませんでした');
+  session.startParty(plan.map(g=>g.id),plan.length);
+  renderPartyIntermission(true);
+}
 function disposeActiveGame(){try{activeCleanup?.()}finally{activeCleanup=null}}
 function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
 function oneDecimal(value){return Number.isFinite(value)?value.toFixed(1):'—'}
@@ -142,7 +165,8 @@ function renderHome(){
   ${groups.length?`<section class="group-list" id="savedGroups">${groups.map(group=>`<article class="group-card ${samePlayers(group.players,session.players)?'active':''}" data-group-card="${group.id}"><div class="group-card-main"><div><div class="eyebrow">${group.players.length===1?'SOLO GROUP':'PLAYER GROUP'}</div><h3>${esc(group.name)}</h3><p>${group.players.map(esc).join(' · ')}</p></div><span class="group-count">${group.players.length}人</span></div><div class="group-actions"><button class="btn quiet" data-load-group="${group.id}">呼び出す</button><button class="btn primary" data-quick-group="${group.id}">${group.players.length===1?'Quick Solo':'Quick Party 3R'}</button></div></article>`).join('')}</section>`:''}
   <section class="panel"><div id="playerList" class="stack"></div><div class="actions"><button class="btn quiet" id="addPlayer">プレイヤー追加</button><button class="btn primary" id="savePlayers">保存</button></div></section>
   <div class="section-head"><h2>Play</h2><span class="muted">おすすめは Party</span></div>
-  <section class="mode-grid"><button class="mode-card featured" id="partyMode" ${session.players.length<2?'disabled':''}><div class="mode-kicker">PARTY</div><h3>${session.players.length<2?'2人以上でParty':'総合戦を組む'}</h3><p>${session.players.length<2?'1人のときは下のSingleゲームを遊べます。':'3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。'}</p><span class="text-link">${session.players.length<2?'プレイヤーを追加すると利用可能':'設定して始める →'}</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>${session.players.length===1?'1人向けゲームで自己ベストを狙えます。':'下の一覧から選択。先に5点取ったプレイヤーが勝ちです。'}</p></div></section>
+  <section class="mode-grid"><button class="mode-card featured" id="partyMode" ${session.players.length<2?'disabled':''}><div class="mode-kicker">PARTY</div><h3>${session.players.length<2?'2人以上でParty':'総合戦を組む'}</h3><p>${session.players.length<2?'1人のときは下のSingleゲームを遊べます。':'3 / 6 / 9ラウンド。遊ぶゲームを選んで、その場に合う構成にできます。'}</p><span class="text-link">${session.players.length<2?'プレイヤーを追加すると利用可能':'手動で設定 →'}</span></button><div class="mode-card static"><div class="mode-kicker">SINGLE</div><h3>1ゲームだけ遊ぶ</h3><p>${session.players.length===1?'1人向けゲームで自己ベストを狙えます。':'下の一覧から選択。先に5点取ったプレイヤーが勝ちです。'}</p></div></section>
+  ${session.players.length>=2?`<section class="smart-party-home"><div><div class="eyebrow">SMART PARTY</div><h3>この${session.players.length}人に合わせて自動構成</h3><p>最近遊んだゲームを避け、人数・お気に入り・評価・Game Health・カテゴリの偏りを見て組みます。</p></div><div class="smart-round-buttons">${[3,6,9].map(n=>`<button class="btn ${n===3?'primary':'quiet'}" data-smart-rounds="${n}">${n}R</button>`).join('')}</div></section>`:''}
   ${!isStandalone()?`<section class="install-card"><div><div class="eyebrow">INSTALL</div><h3>ホーム画面から起動する</h3><p>${isIOS()?'Safariの共有ボタン →「ホーム画面に追加」で、アプリのように独立起動できます。':'対応ブラウザではParty Pocketを端末へインストールできます。'}</p></div><button class="btn quiet" id="installApp">${pwaInstallReady&&canPromptInstall()?'インストール':'追加方法'}</button></section>`:''}
   ${!isOnline()?'<div class="offline-banner">OFFLINE · キャッシュ済みゲームはそのまま遊べます</div>':''}
   ${pwaUpdateRegistration?'<section class="update-card"><div><div class="eyebrow">UPDATE READY</div><b>新しいParty Pocketがあります</b></div><button class="btn primary" id="applyUpdate">更新する</button></section>':''}
@@ -156,7 +180,7 @@ function renderHome(){
   ${favoriteGames.length?`<div class="section-head"><h2>Favorites</h2><span class="muted">${favoriteGames.length} games</span></div><section class="library-list" id="favoriteList">${favoriteGames.map(libraryRowHtml).join('')}</section>`:''}
   ${recentGames.length?`<div class="section-head"><h2>Recent</h2><span class="muted">最近遊んだ</span></div><section class="library-list" id="recentList">${recentGames.map(libraryRowHtml).join('')}</section>`:''}
   <div class="section-head"><h2>Games</h2><span class="muted" id="catalogCount">${games.length} titles</span></div>
-  <section class="catalog-tools"><input id="gameSearch" type="search" inputmode="search" placeholder="ゲーム名・特徴で検索" aria-label="ゲーム検索"><div class="catalog-chips">${CATEGORY_DEFS.map(c=>`<button class="catalog-chip ${c.id==='all'?'active':''}" data-catalog-category="${c.id}">${c.label}</button>`).join('')}</div><div class="smart-filter-grid"><label><span>難易度</span><select id="difficultyFilter"><option value="all">指定なし</option><option value="1">かるめ</option><option value="2">標準</option><option value="3">しっかり</option></select></label><label><span>時間</span><select id="timeFilter"><option value="all">指定なし</option><option value="3">3分以内</option><option value="5">5分以内</option><option value="8">8分以内</option><option value="10">10分以内</option></select></label></div><button class="catalog-chip active-fit" id="recommendedOnly" aria-pressed="true">この${session.players.length}人におすすめだけ</button><button class="btn primary full picker-button" id="pickOne">この条件で1本選ぶ</button><div class="picker-result" id="pickerResult" hidden></div></section>
+  <section class="catalog-tools"><input id="gameSearch" type="search" inputmode="search" placeholder="ゲーム名・特徴で検索" aria-label="ゲーム検索"><div class="catalog-chips">${CATEGORY_DEFS.map(c=>`<button class="catalog-chip ${c.id==='all'?'active':''}" data-catalog-category="${c.id}">${c.label}</button>`).join('')}</div><div class="smart-filter-grid"><label><span>難易度</span><select id="difficultyFilter"><option value="all">指定なし</option><option value="1">かるめ</option><option value="2">標準</option><option value="3">しっかり</option></select></label><label><span>時間</span><select id="timeFilter"><option value="all">指定なし</option><option value="3">3分以内</option><option value="5">5分以内</option><option value="8">8分以内</option><option value="10">10分以内</option></select></label></div><button class="catalog-chip active-fit" id="recommendedOnly" aria-pressed="true">この${session.players.length}人におすすめだけ</button><button class="btn primary full picker-button" id="pickOne">この条件で1本選ぶ</button><button class="btn quiet full" id="buildPartyFromFilter" ${session.players.length<2?'disabled':''}>この条件でSmart Party</button><div class="picker-result" id="pickerResult" hidden></div></section>
   <section class="games" id="gameCatalog"></section>
   <div class="catalog-empty" id="catalogEmpty" hidden>条件に合うゲームがありません。</div>
   <div class="footer">Party Pocket · local play on GitHub Pages</div>`;
@@ -175,10 +199,10 @@ function renderHome(){
     if(group.players.length===1){
       const gameId=soloProgress.daily().gameId;session.startSingle();return startGame(gameId);
     }
-    const ids=listGames().map(g=>g.id),settings=partySettings.load(ids);
-    session.startParty(settings.gameIds,3);return renderPartyIntermission(true);
+    return startSmartParty(3,{players:group.players});
   });
   app.querySelector('#partyMode').onclick=()=>{if(session.players.length<2)return toast('Partyは2人以上で遊べます');saveDraft({quiet:true});renderPartySetup()};
+  app.querySelectorAll('[data-smart-rounds]').forEach(button=>button.onclick=()=>{saveDraft({quiet:true});startSmartParty(+button.dataset.smartRounds)});
   app.querySelector('#installApp')?.addEventListener('click',async()=>{
     if(canPromptInstall()){
       const accepted=await requestInstall();
@@ -218,6 +242,18 @@ function renderHome(){
     e.currentTarget.classList.toggle('active-fit',catalogState.recommendedOnly);
     e.currentTarget.setAttribute('aria-pressed',String(catalogState.recommendedOnly));
     paintCatalog();
+  };
+  app.querySelector('#buildPartyFromFilter').onclick=()=>{
+    if(session.players.length<2)return toast('Partyは2人以上で遊べます');
+    const allowed=filterGames(games,catalogState).map(g=>g.id);
+    if(allowed.length<2)return toast('この条件ではPartyを組めません');
+    const rounds=Math.min(6,Math.max(3,allowed.length));
+    const plan=smartPartyPlan(rounds,{allowedGameIds:allowed});
+    if(plan.length<2)return toast('この条件ではPartyを組めません');
+    const info=summarizeSmartParty(plan),box=app.querySelector('#pickerResult');
+    box.hidden=false;
+    box.innerHTML=`<div><div class="eyebrow">SMART PARTY</div><b>${plan.map(g=>g.emoji+' '+g.title).join(' · ')}</b><small>${plan.length}R · 約${info.totalMinutes}分 · 条件内から自動構成</small></div><button class="btn primary" id="startFilteredParty">これで開始</button>`;
+    box.querySelector('#startFilteredParty').onclick=()=>{session.startParty(plan.map(g=>g.id),plan.length);renderPartyIntermission(true)};
   };
   app.querySelector('#pickOne').onclick=()=>{
     const picked=pickGame(games,catalogState),box=app.querySelector('#pickerResult');
@@ -434,11 +470,13 @@ function renderPartySetup(){
     updateBadge('PARTY SETUP');
     app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="setupBack">←</button><div><div class="eyebrow">PARTY SETUP</div><div class="screen-title">総合戦を組む</div></div></div>
     <section class="panel setup-section"><div class="setup-label">ラウンド数</div><div class="segmented">${[3,6,9].map(n=>`<button class="segment ${state.rounds===n?'active':''}" data-rounds="${n}">${n}</button>`).join('')}</div><p class="helper">短く試すなら3、標準は6、しっかり遊ぶなら9。</p></section>
+    <section class="panel setup-section smart-setup"><div><div class="eyebrow">SMART BUILD</div><div class="setup-label">自動で${state.rounds}本選ぶ</div><p class="helper">人数・履歴・お気に入り・評価・健全性・カテゴリ多様性から構成します。</p></div><button class="btn primary" id="smartBuild">Smart構成</button></section>
     <section class="panel setup-section"><div class="setup-label">プリセット</div><div class="preset-row"><button class="preset-btn" data-preset="all">バランス</button><button class="preset-btn" data-preset="brain">頭脳戦</button><button class="preset-btn" data-preset="strategy">戦略</button><button class="preset-btn" data-preset="foresight">先読み</button><button class="preset-btn" data-preset="perfect">完全情報</button><button class="preset-btn" data-preset="read">読み合い</button><button class="preset-btn" data-preset="talk">会話中心</button><button class="preset-btn" data-preset="quick">短時間</button></div></section>
     <section class="panel setup-section"><div class="setup-head"><div class="setup-label">ゲーム選択</div><span>${state.selected.size}/${games.length}</span></div><div class="select-games">${games.map((g,i)=>`<button class="select-game ${state.selected.has(g.id)?'selected':''}" data-select-game="${g.id}" aria-pressed="${state.selected.has(g.id)}"><span class="game-index">${String(i+1).padStart(2,'0')}</span><span class="select-title">${g.title}</span><span class="select-check">${state.selected.has(g.id)?'選択中':'除外'}</span></button>`).join('')}</div><p class="helper">2ゲーム以上を選択してください。ゲーム数よりラウンド数が多い場合は重複して登場します。</p></section>
     <button class="btn primary full" id="startParty">${state.rounds}ラウンドで開始</button>`;
     app.querySelector('#setupBack').onclick=renderHome;
     app.querySelectorAll('[data-rounds]').forEach(b=>b.onclick=()=>{state.rounds=+b.dataset.rounds;paint()});
+    app.querySelector('#smartBuild').onclick=()=>{const plan=smartPartyPlan(state.rounds);state.selected=new Set(plan.map(g=>g.id));paint();toast('Smart構成を作りました')};
     app.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{state.selected=new Set(presets[b.dataset.preset].filter(id=>ids.includes(id)));paint()});
     app.querySelectorAll('[data-select-game]').forEach(b=>b.onclick=()=>{const id=b.dataset.selectGame;state.selected.has(id)?state.selected.delete(id):state.selected.add(id);paint()});
     app.querySelector('#startParty').onclick=()=>{
