@@ -79,6 +79,13 @@ export class SessionStore{
     const schedule=buildPartySchedule(gameIds,totalRounds,rng);
     this.party={round:0,totalRounds:schedule.length,schedule,active:true,lastAward:null};this.savePartyCheckpoint();this.emit();
   }
+  startPartySchedule(schedule){
+    if(this.players.length<2)throw new Error('party requires at least two players');
+    const exact=Array.isArray(schedule)?schedule.map(String).filter(Boolean):[];
+    if(exact.length<2)throw new Error('party schedule requires at least two games');
+    this.mode='party';this.resetScores();this.partyScores=Array(this.players.length).fill(0);
+    this.party={round:0,totalRounds:exact.length,schedule:[...exact],active:true,lastAward:null};this.savePartyCheckpoint();this.emit();
+  }
   currentPartyGame(){return this.party.schedule[this.party.round]}
   finishPartyRound(){
     const gameScores=[...this.scores],awards=partyAwards(gameScores);awards.forEach((p,i)=>this.partyScores[i]+=p);

@@ -16,6 +16,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Party Pocketの端末データをJSONでバックアップ / 復元可能
 - よく使うプレイヤー構成を最大8グループ保存し、Quick Solo / Quick Partyで即開始
 - Smart Party Builderが人数・履歴・評価から3/6/9ラウンドを自動構成
+- 気に入ったParty構成をゲーム順ごと最大8件保存して再利用
 
 ## Games
 
@@ -90,6 +91,16 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Previewで各ゲームの選出理由 / 推定時間 / 推奨人数を確認
 - ゲーム単位でLock / 1本入替 / ↑↓による順番変更が可能
 - Lockしたゲームを維持したまま残りだけ全部組み直せる
+
+## Saved Parties
+- Party完了画面から現在のゲームscheduleを名前付きで保存
+- ゲームの集合だけでなく実際のプレイ順も保存
+- 最大8件、同名保存は上書き
+- ホームのSaved Partiesから同じ順番で即開始
+- 管理画面から開始 / 削除
+- Party完了画面の「もう一度」も直前の順番をそのまま再現
+- Smart Party Previewの確定後もPreview表示順をそのまま実行
+- Data Vaultバックアップへ自動的に含まれる
 
 ## Modes
 
@@ -215,6 +226,7 @@ src/
 │  ├ backup.js
 │  ├ groups.js
 │  ├ recommender.js
+│  ├ party-presets.js
 │  └ transport.js
 └ games/
    ├ sync.js

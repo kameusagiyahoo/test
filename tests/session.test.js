@@ -69,3 +69,23 @@ test('session can persist one player for solo games but Party requires two',()=>
   const restored=new SessionStore({storage});
   assert.deepEqual(restored.players,['Solo']);
 });
+
+test('exact party schedule preserves the supplied order without shuffling',()=>{
+  const storage=memoryStorage();
+  const session=new SessionStore({storage});
+  session.savePlayers(['A','B']);
+  session.startPartySchedule(['code','gate','bomb']);
+  assert.equal(session.mode,'party');
+  assert.deepEqual(session.party.schedule,['code','gate','bomb']);
+  assert.equal(session.party.totalRounds,3);
+  assert.equal(session.currentPartyGame(),'code');
+  session.addScore(0,1);
+  session.finishPartyRound();
+  assert.equal(session.currentPartyGame(),'gate');
+});
+
+test('exact party schedule rejects fewer than two games',()=>{
+  const session=new SessionStore({storage:memoryStorage()});
+  session.savePlayers(['A','B']);
+  assert.throws(()=>session.startPartySchedule(['code']),/at least two games/);
+});
