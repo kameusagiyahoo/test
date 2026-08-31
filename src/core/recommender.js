@@ -109,6 +109,63 @@ export function buildSmartParty(games,{
   return selected;
 }
 
+export function buildSmartPartyWithLocks(games,{
+  playerCount=2,
+  rounds=3,
+  favoriteIds=[],
+  recentIds=[],
+  playtestRows=[],
+  healthRows=[],
+  allowedGameIds=null,
+  lockedIds=[],
+  rng=Math.random
+}={}){
+  const allowed=allowedGameIds?new Set(allowedGameIds):null;
+  const byId=new Map((games||[]).map(g=>[g.id,g]));
+  const locked=uniq(lockedIds).map(id=>byId.get(id)).filter(game=>game&&(!allowed||allowed.has(game.id)));
+  const remainingRounds=Math.max(0,rounds-locked.length);
+  const pool=(games||[]).filter(game=>!locked.some(x=>x.id===game.id));
+  const fill=buildSmartParty(pool,{
+    playerCount,
+    rounds:remainingRounds,
+    favoriteIds,
+    recentIds,
+    playtestRows,
+    healthRows,
+    allowedGameIds:allowed? [...allowed].filter(id=>!locked.some(x=>x.id===id)):null,
+    rng
+  });
+  return [...locked,...fill].slice(0,rounds);
+}
+
+export function replaceSmartPartyGame(games,currentGameIds,targetGameId,{
+  playerCount=2,
+  favoriteIds=[],
+  recentIds=[],
+  playtestRows=[],
+  healthRows=[],
+  allowedGameIds=null,
+  rng=Math.random
+}={}){
+  const selectedIds=uniq(currentGameIds).filter(id=>id!==targetGameId);
+  const allowed=allowedGameIds?new Set(allowedGameIds):null;
+  const candidates=(games||[]).filter(game=>
+    !selectedIds.includes(game.id)&&game.id!==targetGameId&&(!allowed||allowed.has(game.id))
+  );
+  if(!candidates.length)return null;
+
+  const selected=(games||[]).filter(game=>selectedIds.includes(game.id));
+  return candidates.map(game=>{
+    const base=scorePartyGame(game,{playerCount,favoriteIds,recentIds,playtestRows,healthRows});
+    const adjusted=base.score+noveltyBonus(game,selected)+difficultyBonus(game,selected)+rng()*.001;
+    return{game,adjusted};
+  }).sort((a,b)=>b.adjusted-a.adjusted||a.game.id.localeCompare(b.game.id))[0]?.game||null;
+}
+
+export function smartPartyReasons(game,options={}){
+  return scorePartyGame(game,options).reasons;
+}
+
 export function summarizeSmartParty(games){
   const totalMinutes=games.reduce((sum,g)=>sum+gameMeta(g.id).minutes,0);
   const categories=uniq(games.flatMap(g=>categoriesFor(g.id)).filter(id=>!['solo','duel'].includes(id)));

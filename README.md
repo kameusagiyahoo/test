@@ -86,6 +86,10 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Player GroupのQuick Party 3RもSmart構成を利用
 - Party Setupの「Smart構成」で自動選択後に手動調整可能
 - Game Catalogの検索・カテゴリ・難易度・時間条件からSmart Partyを作成可能
+- Smart Party開始前にPreview画面を表示
+- Previewで各ゲームの選出理由 / 推定時間 / 推奨人数を確認
+- ゲーム単位でLock / 1本入替 / ↑↓による順番変更が可能
+- Lockしたゲームを維持したまま残りだけ全部組み直せる
 
 ## Modes
 
