@@ -227,6 +227,8 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Context Signal由来の実験は、評価が低かったmode / Solo difficultyだけを追跡
 - Health / Manual実験はゲーム全体のレビューを追跡
 - Testing開始後の新規レビューをAfterとして集計
+- Baseline 2件未満ではTESTINGを開始しない
+- TESTING開始後はAfter 3件が集まるまでCOLLECTINGとして継続し、DONEへ進めない
 - Baseline 2件 + After 3件以上で自動判定
 - Qualityは Fun / Clarity / Replay の平均で判定し、Brain Loadは品質判定に含めず差分のみ表示
 - Quality差 +0.5以上 = IMPROVED、-0.5以下 = WORSE、それ以外 = FLAT
