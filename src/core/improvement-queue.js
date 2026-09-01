@@ -6,6 +6,7 @@ function readJson(storage,key,fallback){
   try{const raw=storage?.getItem?.(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
 }
 function cleanText(value,max=240){return String(value||'').trim().slice(0,max)}
+function numericOrNull(value){return value==null||value===''||!Number.isFinite(Number(value))?null:Number(value)}
 function normalizeSource(source={}){
   const kind=['health','context','manual'].includes(source?.kind)?source.kind:'manual';
   return{
@@ -18,8 +19,7 @@ function normalizeSource(source={}){
 function normalizeAxes(raw={}){
   const axes={};
   for(const id of ['fun','clarity','brain','replay']){
-    const value=Number(raw?.[id]);
-    axes[id]=Number.isFinite(value)?value:null;
+    axes[id]=numericOrNull(raw?.[id]);
   }
   return axes;
 }
@@ -36,7 +36,7 @@ function normalizeBaseline(raw){
     cohort:normalizeCohort(raw.cohort),
     count,
     axes:normalizeAxes(raw.axes),
-    quality:Number.isFinite(Number(raw.quality))?Number(raw.quality):null
+    quality:numericOrNull(raw.quality)
   };
 }
 function normalizeResult(raw){
@@ -48,14 +48,14 @@ function normalizeResult(raw){
     cohort:normalizeCohort(raw.cohort),
     baselineCount:Math.max(0,Number(raw.baselineCount)||0),
     afterCount:Math.max(0,Number(raw.afterCount)||0),
-    beforeQuality:Number.isFinite(Number(raw.beforeQuality))?Number(raw.beforeQuality):null,
-    afterQuality:Number.isFinite(Number(raw.afterQuality))?Number(raw.afterQuality):null,
-    qualityDelta:Number.isFinite(Number(raw.qualityDelta))?Number(raw.qualityDelta):null,
+    beforeQuality:numericOrNull(raw.beforeQuality),
+    afterQuality:numericOrNull(raw.afterQuality),
+    qualityDelta:numericOrNull(raw.qualityDelta),
     axes:Array.isArray(raw.axes)?raw.axes.map(row=>({
       id:cleanText(row?.id,20),
-      before:Number.isFinite(Number(row?.before))?Number(row.before):null,
-      after:Number.isFinite(Number(row?.after))?Number(row.after):null,
-      delta:Number.isFinite(Number(row?.delta))?Number(row.delta):null
+      before:numericOrNull(row?.before),
+      after:numericOrNull(row?.after),
+      delta:numericOrNull(row?.delta)
     })).filter(row=>row.id):[]
   };
 }
@@ -128,16 +128,17 @@ export class ImprovementQueueStore{
     const now=this.now();let updated=null;
     const next=this.all().map(item=>{
       if(item.id!==id)return item;
+      const has=key=>Object.prototype.hasOwnProperty.call(patch,key);
       updated=normalize({
         ...item,
-        title:patch.title??item.title,
-        note:patch.note??item.note,
-        status:patch.status??item.status,
-        testingStartedAt:patch.testingStartedAt??item.testingStartedAt,
-        baseline:patch.baseline??item.baseline,
-        finalResult:patch.finalResult??item.finalResult,
+        title:has('title')?patch.title:item.title,
+        note:has('note')?patch.note:item.note,
+        status:has('status')?patch.status:item.status,
+        testingStartedAt:has('testingStartedAt')?patch.testingStartedAt:item.testingStartedAt,
+        baseline:has('baseline')?patch.baseline:item.baseline,
+        finalResult:has('finalResult')?patch.finalResult:item.finalResult,
         updatedAt:now,
-        completedAt:patch.completedAt??item.completedAt
+        completedAt:has('completedAt')?patch.completedAt:item.completedAt
       });
       return updated;
     });
