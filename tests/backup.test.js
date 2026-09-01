@@ -106,3 +106,16 @@ test('active and completed party history are included in Data Vault backup',()=>
   assert.ok(backup.data.partyPocketPartyActiveV1);
   assert.doesNotThrow(()=>validateBackup(backup));
 });
+
+test('contextual playtest events are included and JSON-validated in Data Vault',()=>{
+  const storage=memoryStorage({
+    partyPocketPlaytestEventsV1:JSON.stringify([{
+      gameId:'code',scores:{fun:4,clarity:3,brain:5,replay:4},mode:'party',playerCount:4,at:123
+    }])
+  });
+  const backup=createBackup(storage,{appVersion:'8.25.0'});
+  assert.ok(backup.data.partyPocketPlaytestEventsV1);
+  assert.doesNotThrow(()=>validateBackup(backup));
+  const broken={...backup,data:{...backup.data,partyPocketPlaytestEventsV1:'not-json'}};
+  assert.throws(()=>validateBackup(broken),/invalid JSON/);
+});
