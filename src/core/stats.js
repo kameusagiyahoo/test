@@ -1,5 +1,6 @@
 const STATS_KEY='partyPocketStatsV1';
 const MAX_HISTORY=200;
+const SOLO_DIFFICULTIES=new Set(['easy','normal','hard']);
 
 function readJson(storage,key,fallback){
   try{const raw=storage?.getItem?.(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
@@ -17,6 +18,8 @@ function normalizeEntry(entry){
     players,
     scores,
     winners:[...new Set(winners)],
+    difficulty:SOLO_DIFFICULTIES.has(entry.difficulty)?entry.difficulty:null,
+    clearRounds:Number.isInteger(entry.clearRounds)&&entry.clearRounds>0?entry.clearRounds:null,
     at:Number(entry.at)||Date.now()
   };
 }
@@ -32,8 +35,8 @@ export class StatsStore{
     this.storage?.setItem?.(STATS_KEY,JSON.stringify(value));
     return value;
   }
-  record({gameId,mode='single',players,scores,winners,at}){
-    const entry=normalizeEntry({gameId,mode,players,scores,winners,at:at??this.now()});
+  record({gameId,mode='single',players,scores,winners,difficulty=null,clearRounds=null,at}){
+    const entry=normalizeEntry({gameId,mode,players,scores,winners,difficulty,clearRounds,at:at??this.now()});
     if(!entry)throw new Error('invalid stats entry');
     this.save([entry,...this.history()]);
     return entry;

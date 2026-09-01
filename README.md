@@ -25,6 +25,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Game Insightsでゲーム単位の実績・Playtest・Health根拠を統合表示
 - Playtest Timelineで新規4軸評価を日時・モード・人数付きイベントとして保存
 - Solo 3ゲームにEasy / Normal / Hardを追加し、難易度別自己ベストとDaily難易度を管理
+- Solo Analyticsで難易度別の完走数・平均R・最短R・pt/Rを比較
 
 ## Games
 
@@ -186,6 +187,16 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - v8.24以前の累積平均はそのまま保持し、存在しない過去イベントは生成しない
 - 新規TimelineイベントはData Vaultバックアップ対象
 
+## Solo Analytics / Difficulty Records
+- Solo完走時のdifficultyとclearRoundsをStatsへ追加保存
+- 既存Stats形式と互換で、difficulty / clearRoundsは任意フィールド
+- Game InsightsのSolo対応3ゲームにEasy / Normal / Hard比較を表示
+- 難易度別に完走数 / 平均クリアラウンド / 最短クリア / 平均pt per round / 最長連続成功を表示
+- 完走数と最短はSolo Progressを利用し、Stats 200件上限の影響を受けにくくする
+- 平均R / pt per roundはv8.27以降にclearRoundsが実記録された完走だけで算出
+- v8.26以前の1人Solo StatsはNormal件数として扱うが、ラウンド数は推測しない
+- 1人Soloの勝率は完走時に必ず100%になるため、難易度比較指標としては表示しない
+
 ## Modes
 
 ### Solo Challenge
@@ -325,6 +336,7 @@ src/
 │  ├ season.js
 │  ├ game-insights.js
 │  ├ playtest-events.js
+│  ├ solo-analytics.js
 │  └ transport.js
 └ games/
    ├ sync.js

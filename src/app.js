@@ -18,6 +18,7 @@ import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShare
 import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from './core/season.js';
 import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insights.js';
 import {PlaytestEventStore,buildPlaytestTimeline} from './core/playtest-events.js';
+import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -58,7 +59,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.26.0';
+const APP_VERSION='8.27.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -194,7 +195,7 @@ function soloDifficultyDetail(gameId,difficulty){
 function renderGameInsights(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,playtestEvents.forGame(id)),status=insight.health?.status||'data';
+  const insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,playtestEvents.forGame(id)),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
   updateBadge('GAME INSIGHTS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
   <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
@@ -203,6 +204,9 @@ function renderGameInsights(id){
   <section class="mode-split"><div><span>Single</span><b>${Math.round(insight.singleShare*100)}%</b><i><em style="width:${Math.round(insight.singleShare*100)}%"></em></i></div><div><span>Party</span><b>${Math.round(insight.partyShare*100)}%</b><i><em style="width:${Math.round(insight.partyShare*100)}%"></em></i></div></section>
   <div class="section-head compact-head"><h2>Player Count</h2><span class="muted">何人で遊ばれたか</span></div>
   <section class="insight-buckets">${insight.playerCountBuckets.length?insight.playerCountBuckets.map(row=>`<div><b>${row.playerCount}人</b><span>${row.plays}回 · ${Math.round(row.share*100)}%</span></div>`).join(''):'<div class="catalog-empty">人数データがありません。</div>'}</section>
+  ${soloAnalytics?`<div class="section-head compact-head"><h2>Solo Difficulty Records</h2><span class="muted">1人完走の効率</span></div>
+  <section class="solo-analytics-grid">${soloAnalytics.rows.map(row=>`<article class="solo-analytics-card ${row.difficulty}"><div class="solo-analytics-title"><b>${soloDifficultyLabel(row.difficulty)}</b><span>${soloDifficultyDetail(id,row.difficulty)}</span></div><div class="solo-analytics-metrics"><div><b>${row.clears}</b><span>完走</span></div><div><b>${Number.isFinite(row.averageRounds)?oneDecimal(row.averageRounds)+'R':'—'}</b><span>平均R</span></div><div><b>${row.bestRounds??'—'}${row.bestRounds?'R':''}</b><span>最短</span></div><div><b>${Number.isFinite(row.averagePointsPerRound)?oneDecimal(row.averagePointsPerRound):'—'}</b><span>pt/R</span></div></div><small>ラウンド記録 ${row.roundTrackedRuns}件 · 最長連続成功 ${row.bestStreak}</small></article>`).join('')}</section>
+  <div class="lab-note">完走数・最短記録はSolo Progressを利用。平均ラウンドとpt/Rはv8.27以降にStatsへ記録された完走のみで計算し、過去のラウンド数は推測しません。</div>`:''}
   <div class="section-head compact-head"><h2>Playtest</h2><span class="muted">新4軸評価 ${insight.reviews}件</span></div>
   <section class="insight-axes">${insight.axes.map(axis=>`<div><span>${insightAxisLabel(axis.id)}</span><b>${oneDecimal(axis.average)}</b><i><em style="width:${Number.isFinite(axis.average)?Math.round(axis.average/5*100):0}%"></em></i><small>${axis.count} responses</small></div>`).join('')}</section>
   <div class="section-head compact-head"><h2>Review Timeline</h2><span class="muted">v8.25以降の新規評価</span></div>
@@ -825,7 +829,7 @@ function completeRound(restart){
     }
     if(Math.max(...session.scores)>=5){
       const winners=session.winnerIndexes(false);
-      stats.record({gameId:lastSingleGameId,mode:'single',players:[...session.players],scores:[...session.scores],winners});
+      stats.record({gameId:lastSingleGameId,mode:'single',players:[...session.players],scores:[...session.scores],winners,difficulty:soloRun?.difficulty||null,clearRounds:soloRun?.rounds||null});
       if(soloRun){
         soloProgress.recordRun(lastSingleGameId,{difficulty:soloRun.difficulty,rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,completed:true});
         lastSoloResult={gameId:lastSingleGameId,difficulty:soloRun.difficulty,rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,game:soloProgress.game(lastSingleGameId,soloRun.difficulty),daily:soloProgress.daily()};
