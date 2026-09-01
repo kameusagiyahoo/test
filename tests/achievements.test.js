@@ -71,7 +71,7 @@ test('unlocked achievements only returns completed badges',()=>{
 });
 
 test('achievement board ranks unlocked count before play count',()=>{
-  const a=profile({name:'A',wins:10,plays:10});
+  const a=profile({name:'A',wins:10,plays:10,partyWins:1});
   const b=profile({name:'B',wins:1,plays:100});
   const board=achievementBoard([b,a]);
   assert.equal(board[0].name,'A');
