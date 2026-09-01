@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  PlaytestEventStore,PLAYTEST_EVENT_LIMIT,buildPlaytestTimeline,timelineAxisTrend
+  PlaytestEventStore,PLAYTEST_EVENT_LIMIT,buildPlaytestSegments,buildPlaytestTimeline,contextualPlaytestSignals,timelineAxisTrend
 } from '../src/core/playtest-events.js';
 
 function memoryStorage(seed={}){
@@ -101,4 +101,61 @@ test('forGame and valid-id filtering keep unrelated games out',()=>{
   const store=new PlaytestEventStore(memoryStorage({partyPocketPlaytestEventsV1:seed}));
   assert.deepEqual(store.forGame('code').map(e=>e.gameId),['code']);
   assert.deepEqual(store.all(['gate']).map(e=>e.gameId),['gate']);
+});
+
+test('context segments aggregate Single and Party axis averages separately',()=>{
+  const events=[
+    {gameId:'code',scores:scores(5,4,4,5),mode:'single',playerCount:2,at:4},
+    {gameId:'code',scores:scores(3,4,2,3),mode:'single',playerCount:2,at:3},
+    {gameId:'code',scores:scores(2,2,5,2),mode:'party',playerCount:4,at:2},
+    {gameId:'code',scores:scores(4,2,5,2),mode:'party',playerCount:4,at:1}
+  ];
+  const segments=buildPlaytestSegments('code',events);
+  const single=segments.modeSegments.find(row=>row.id==='single');
+  const party=segments.modeSegments.find(row=>row.id==='party');
+  assert.equal(single.count,2);
+  assert.equal(party.count,2);
+  assert.equal(single.axes.find(row=>row.id==='fun').average,4);
+  assert.equal(party.axes.find(row=>row.id==='clarity').average,2);
+});
+
+test('difficulty segments keep Easy Normal Hard independent',()=>{
+  const events=[
+    {gameId:'memory',scores:scores(5,5,2,5),mode:'single',playerCount:1,difficulty:'easy',at:3},
+    {gameId:'memory',scores:scores(4,4,3,4),mode:'single',playerCount:1,difficulty:'normal',at:2},
+    {gameId:'memory',scores:scores(2,3,5,2),mode:'single',playerCount:1,difficulty:'hard',at:1}
+  ];
+  const segments=buildPlaytestSegments('memory',events);
+  assert.deepEqual(segments.difficultySegments.map(row=>[row.id,row.count]),[['easy',1],['normal',1],['hard',1]]);
+  assert.equal(segments.difficultySegments.find(row=>row.id==='hard').axes.find(row=>row.id==='brain').average,5);
+});
+
+test('context signals require two reviews per compared segment and a one-point gap',()=>{
+  const enough=[
+    {gameId:'code',scores:scores(5,5,3,5),mode:'single',playerCount:2,at:4},
+    {gameId:'code',scores:scores(5,5,3,5),mode:'single',playerCount:2,at:3},
+    {gameId:'code',scores:scores(3,3,3,3),mode:'party',playerCount:4,at:2},
+    {gameId:'code',scores:scores(3,3,3,3),mode:'party',playerCount:4,at:1}
+  ];
+  const signals=contextualPlaytestSignals(buildPlaytestSegments('code',enough));
+  assert.ok(signals.some(signal=>signal.type==='mode'&&signal.axis==='fun'&&signal.low==='party'&&signal.gap===2));
+
+  const sparse=enough.slice(0,3);
+  assert.deepEqual(contextualPlaytestSignals(buildPlaytestSegments('code',sparse)),[]);
+});
+
+test('difficulty context signals compare only difficulty tiers with enough data',()=>{
+  const events=[
+    {gameId:'memory',scores:scores(5,5,2,5),mode:'single',playerCount:1,difficulty:'easy',at:6},
+    {gameId:'memory',scores:scores(5,5,2,5),mode:'single',playerCount:1,difficulty:'easy',at:5},
+    {gameId:'memory',scores:scores(4,4,3,4),mode:'single',playerCount:1,difficulty:'normal',at:4},
+    {gameId:'memory',scores:scores(4,4,3,4),mode:'single',playerCount:1,difficulty:'normal',at:3},
+    {gameId:'memory',scores:scores(2,3,5,2),mode:'single',playerCount:1,difficulty:'hard',at:2},
+    {gameId:'memory',scores:scores(2,3,5,2),mode:'single',playerCount:1,difficulty:'hard',at:1}
+  ];
+  const signals=contextualPlaytestSignals(buildPlaytestSegments('memory',events));
+  const replay=signals.find(signal=>signal.type==='difficulty'&&signal.axis==='replay');
+  assert.equal(replay.high,'easy');
+  assert.equal(replay.low,'hard');
+  assert.equal(replay.gap,3);
 });

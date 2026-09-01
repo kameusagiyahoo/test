@@ -17,7 +17,7 @@ import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,un
 import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
 import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from './core/season.js';
 import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insights.js';
-import {PlaytestEventStore,buildPlaytestTimeline} from './core/playtest-events.js';
+import {PlaytestEventStore,buildPlaytestSegments,buildPlaytestTimeline,contextualPlaytestSignals} from './core/playtest-events.js';
 import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
@@ -59,7 +59,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.27.0';
+const APP_VERSION='8.28.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -182,6 +182,14 @@ function gameInsightData(id){
 function insightAxisLabel(id){
   return id==='fun'?'面白さ':id==='clarity'?'分かりやすさ':id==='brain'?'頭を使う度':'もう一度遊びたい';
 }
+function segmentAxis(segment,id){
+  return segment?.axes?.find(row=>row.id===id)?.average;
+}
+function contextSignalText(signal){
+  const axis=insightAxisLabel(signal.axis);
+  const names={single:'Single',party:'Party',easy:'Easy',normal:'Normal',hard:'Hard'};
+  return `${names[signal.low]||signal.low}の${axis}が${names[signal.high]||signal.high}より${signal.gap.toFixed(1)}低い`;
+}
 function soloDifficultyDetail(gameId,difficulty){
   const level=normalizeSoloDifficulty(difficulty);
   const details={
@@ -195,7 +203,7 @@ function soloDifficultyDetail(gameId,difficulty){
 function renderGameInsights(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,playtestEvents.forGame(id)),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
+  const eventRows=playtestEvents.forGame(id),insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,eventRows),segments=buildPlaytestSegments(id,eventRows),contextSignals=contextualPlaytestSignals(segments),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
   updateBadge('GAME INSIGHTS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
   <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
@@ -209,6 +217,13 @@ function renderGameInsights(id){
   <div class="lab-note">完走数・最短記録はSolo Progressを利用。平均ラウンドとpt/Rはv8.27以降にStatsへ記録された完走のみで計算し、過去のラウンド数は推測しません。</div>`:''}
   <div class="section-head compact-head"><h2>Playtest</h2><span class="muted">新4軸評価 ${insight.reviews}件</span></div>
   <section class="insight-axes">${insight.axes.map(axis=>`<div><span>${insightAxisLabel(axis.id)}</span><b>${oneDecimal(axis.average)}</b><i><em style="width:${Number.isFinite(axis.average)?Math.round(axis.average/5*100):0}%"></em></i><small>${axis.count} responses</small></div>`).join('')}</section>
+  <div class="section-head compact-head"><h2>Context Split</h2><span class="muted">実際の評価イベントのみ</span></div>
+  <section class="context-segment-groups">
+    <div class="context-segment-group"><div class="context-segment-label">MODE</div><div class="context-segment-grid">${segments.modeSegments.map(segment=>`<article class="context-segment-card"><div><b>${segment.label}</b><span>${segment.count} reviews</span></div><div class="context-axis-mini">${segment.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${oneDecimal(axis.average)}</b></span>`).join('')}</div></article>`).join('')}</div></div>
+    ${segments.difficultySegments.some(segment=>segment.count)?`<div class="context-segment-group"><div class="context-segment-label">SOLO DIFFICULTY</div><div class="context-segment-grid three">${segments.difficultySegments.map(segment=>`<article class="context-segment-card ${segment.id}"><div><b>${segment.label}</b><span>${segment.count} reviews</span></div><div class="context-axis-mini">${segment.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${oneDecimal(axis.average)}</b></span>`).join('')}</div></article>`).join('')}</div></div>`:''}
+  </section>
+  <section class="context-signals">${contextSignals.length?contextSignals.slice(0,4).map(signal=>`<div class="context-signal"><span class="context-signal-mark">Δ</span><span><b>${esc(contextSignalText(signal))}</b><small>${signal.type==='mode'?'Single / Party':'Solo難易度'}の各セグメント2件以上で比較 · 差 ${signal.gap.toFixed(1)}</small></span></div>`).join(''):'<div class="catalog-empty">十分な件数のあるセグメント間で1.0点以上の差はまだありません。</div>'}</section>
+  <div class="lab-note">Context Signalは各比較セグメント2件以上、4軸平均の差1.0以上で表示します。少数レビューだけでは改善警告にしません。</div>
   <div class="section-head compact-head"><h2>Review Timeline</h2><span class="muted">v8.25以降の新規評価</span></div>
   ${timeline.total?`<section class="review-timeline-summary"><div><b>${timeline.total}</b><span>tracked</span></div><div><b>${timeline.currentCount}</b><span>直近30日</span></div><div><b>${timeline.previousCount}</b><span>前30日</span></div><div><b>${timeline.modes.single}/${timeline.modes.party}</b><span>Single / Party</span></div></section><section class="review-trends">${timeline.axes.map(axis=>{const label=insightAxisLabel(axis.id),delta=axis.delta;return`<div><span>${label}</span><b>${Number.isFinite(axis.currentAverage)?axis.currentAverage.toFixed(1):'—'}</b><small>${Number.isFinite(delta)?`${delta>0?'+':''}${delta.toFixed(1)} vs 前30日`:'比較データ待ち'}</small></div>`}).join('')}</section><section class="review-event-list">${timeline.recent.slice(0,6).map(event=>`<div class="review-event-row"><span><b>${event.mode==='party'?'Party':'Single'} · ${event.playerCount}人${event.difficulty?` · ${soloDifficultyLabel(event.difficulty)}`:''}</b><small>${formatPlayedAt(event.at)}</small></span><span class="review-event-scores">F ${event.scores.fun} · C ${event.scores.clarity} · B ${event.scores.brain} · R ${event.scores.replay}</span></div>`).join('')}</section>`:'<div class="catalog-empty">次に記録する4軸評価からTimelineを開始します。</div>'}
   <div class="lab-note">既存の累積Playtest平均はそのまま利用します。v8.25以前の個別評価日時は存在しないため、過去イベントを推測生成せず、Timelineは新規評価だけで比較します。</div>

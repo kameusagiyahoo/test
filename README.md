@@ -26,6 +26,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Playtest Timelineで新規4軸評価を日時・モード・人数付きイベントとして保存
 - Solo 3ゲームにEasy / Normal / Hardを追加し、難易度別自己ベストとDaily難易度を管理
 - Solo Analyticsで難易度別の完走数・平均R・最短R・pt/Rを比較
+- Contextual Playtest SegmentsでSingle/Party・Solo難易度別の4軸評価差を比較
 
 ## Games
 
@@ -196,6 +197,16 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 平均R / pt per roundはv8.27以降にclearRoundsが実記録された完走だけで算出
 - v8.26以前の1人Solo StatsはNormal件数として扱うが、ラウンド数は推測しない
 - 1人Soloの勝率は完走時に必ず100%になるため、難易度比較指標としては表示しない
+
+## Contextual Playtest Segments
+- v8.25以降のPlaytest Eventをモード / Solo難易度で分割集計
+- Single vs Partyで面白さ / 分かりやすさ / 頭を使う度 / 再プレイ意向を比較
+- Solo対応ゲームではEasy / Normal / Hardの4軸平均を比較
+- 各セグメントのレビュー件数を明示し、データがない区分は「—」表示
+- Context Signalは比較する各セグメント2件以上 + 平均差1.0点以上でのみ表示
+- 差が大きい軸を最大4件表示し、どのコンテキストで評価が下がっているかを示す
+- 既存の累積Playtest平均やHealth判定は変更せず、Context Signalは補助的な改善材料として扱う
+- 新しい保存形式は追加せず、既存Playtest Eventから都度算出
 
 ## Modes
 

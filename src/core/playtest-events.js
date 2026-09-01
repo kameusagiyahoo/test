@@ -95,6 +95,62 @@ export function buildPlaytestTimeline(gameId,events=[],{
   };
 }
 
+function aggregateSegment(id,label,events=[]){
+  const rows=Array.isArray(events)?events:[];
+  return{
+    id,label,count:rows.length,
+    axes:AXES.map(axis=>({id:axis,average:average(rows,axis)}))
+  };
+}
+
+export function buildPlaytestSegments(gameId,events=[]){
+  const rows=(Array.isArray(events)?events:[])
+    .map(normalizeEvent)
+    .filter(Boolean)
+    .filter(event=>event.gameId===gameId);
+
+  const modeSegments=[
+    aggregateSegment('single','Single',rows.filter(event=>event.mode==='single')),
+    aggregateSegment('party','Party',rows.filter(event=>event.mode==='party'))
+  ];
+
+  const difficultySegments=DIFFICULTIES.map(level=>
+    aggregateSegment(level,level[0].toUpperCase()+level.slice(1),rows.filter(event=>event.difficulty===level))
+  );
+
+  return{gameId,total:rows.length,modeSegments,difficultySegments};
+}
+
+function axisValue(segment,axis){
+  return segment?.axes?.find(row=>row.id===axis)?.average;
+}
+
+export function contextualPlaytestSignals(segments,{minCount=2,minGap=1}={}){
+  const signals=[];
+  const modeEligible=(segments?.modeSegments||[]).filter(segment=>segment.count>=minCount);
+  if(modeEligible.length===2){
+    for(const axis of AXES){
+      const a=modeEligible[0],b=modeEligible[1],av=axisValue(a,axis),bv=axisValue(b,axis);
+      if(Number.isFinite(av)&&Number.isFinite(bv)&&Math.abs(av-bv)>=minGap){
+        const high=av>bv?a:b,low=av>bv?b:a;
+        signals.push({type:'mode',axis,high:high.id,low:low.id,gap:Math.abs(av-bv),highAverage:axisValue(high,axis),lowAverage:axisValue(low,axis)});
+      }
+    }
+  }
+
+  const difficultyEligible=(segments?.difficultySegments||[]).filter(segment=>segment.count>=minCount);
+  if(difficultyEligible.length>=2){
+    for(const axis of AXES){
+      const values=difficultyEligible.map(segment=>({segment,value:axisValue(segment,axis)})).filter(row=>Number.isFinite(row.value));
+      if(values.length<2)continue;
+      values.sort((a,b)=>b.value-a.value);
+      const high=values[0],low=values.at(-1),gap=high.value-low.value;
+      if(gap>=minGap)signals.push({type:'difficulty',axis,high:high.segment.id,low:low.segment.id,gap,highAverage:high.value,lowAverage:low.value});
+    }
+  }
+  return signals.sort((a,b)=>b.gap-a.gap);
+}
+
 export function timelineAxisTrend(timeline,axis){
   const row=timeline?.axes?.find(item=>item.id===axis);
   if(!row||!Number.isFinite(row.delta))return null;
