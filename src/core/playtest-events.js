@@ -1,6 +1,7 @@
 const KEY='partyPocketPlaytestEventsV1';
 const MAX_EVENTS=300;
 const AXES=['fun','clarity','brain','replay'];
+const DIFFICULTIES=['easy','normal','hard'];
 
 function readJson(storage,key,fallback){
   try{const raw=storage?.getItem?.(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
@@ -23,6 +24,7 @@ function normalizeEvent(event){
     scores,
     mode:event.mode==='party'?'party':'single',
     playerCount,
+    difficulty:DIFFICULTIES.includes(event.difficulty)?event.difficulty:null,
     at:Number(event.at)||Date.now()
   };
 }
@@ -43,8 +45,8 @@ export class PlaytestEventStore{
       .sort((a,b)=>b.at-a.at)
       .slice(0,MAX_EVENTS);
   }
-  record(gameId,scores,{mode='single',playerCount=1,at}={}){
-    const event=normalizeEvent({gameId,scores,mode,playerCount,at:at??this.now()});
+  record(gameId,scores,{mode='single',playerCount=1,difficulty=null,at}={}){
+    const event=normalizeEvent({gameId,scores,mode,playerCount,difficulty,at:at??this.now()});
     if(!event)throw new Error('invalid playtest event');
     const next=[event,...this.all()].slice(0,MAX_EVENTS);
     this.storage?.setItem?.(KEY,JSON.stringify(next));
