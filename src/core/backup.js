@@ -11,6 +11,7 @@ const JSON_KEYS=new Set([
   'partyPocketPartySettingsV1',
   'partyPocketLibraryV1',
   'partyPocketPlaytestV1',
+  'partyPocketPlaytestEventsV1',
   'partyPocketStatsV1',
   'partyPocketSoloProgressV1',
   'partyPocketSavedPartiesV1',
