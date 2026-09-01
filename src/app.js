@@ -19,6 +19,7 @@ import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from '
 import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insights.js';
 import {PlaytestEventStore,buildPlaytestSegments,buildPlaytestTimeline,contextualPlaytestSignals} from './core/playtest-events.js';
 import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
+import {ImprovementQueueStore,experimentStatusLabel} from './core/improvement-queue.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -47,6 +48,7 @@ const soloProgress=new SoloProgressStore(globalThis.localStorage);
 const playerGroups=new PlayerGroupStore(globalThis.localStorage);
 const savedParties=new SavedPartyStore(globalThis.localStorage);
 const partyHistory=new PartyHistoryStore(globalThis.localStorage);
+const improvementQueue=new ImprovementQueueStore(globalThis.localStorage);
 const app=document.querySelector('#app');
 const badge=document.querySelector('#sessionBadge');
 const homeButton=document.querySelector('#homeButton');
@@ -59,7 +61,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.28.0';
+const APP_VERSION='8.29.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -203,7 +205,7 @@ function soloDifficultyDetail(gameId,difficulty){
 function renderGameInsights(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const eventRows=playtestEvents.forGame(id),insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,eventRows),segments=buildPlaytestSegments(id,eventRows),contextSignals=contextualPlaytestSignals(segments),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
+  const eventRows=playtestEvents.forGame(id),insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,eventRows),segments=buildPlaytestSegments(id,eventRows),contextSignals=contextualPlaytestSignals(segments),experiments=improvementQueue.forGame(id),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
   updateBadge('GAME INSIGHTS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
   <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
@@ -222,7 +224,7 @@ function renderGameInsights(id){
     <div class="context-segment-group"><div class="context-segment-label">MODE</div><div class="context-segment-grid">${segments.modeSegments.map(segment=>`<article class="context-segment-card"><div><b>${segment.label}</b><span>${segment.count} reviews</span></div><div class="context-axis-mini">${segment.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${oneDecimal(axis.average)}</b></span>`).join('')}</div></article>`).join('')}</div></div>
     ${segments.difficultySegments.some(segment=>segment.count)?`<div class="context-segment-group"><div class="context-segment-label">SOLO DIFFICULTY</div><div class="context-segment-grid three">${segments.difficultySegments.map(segment=>`<article class="context-segment-card ${segment.id}"><div><b>${segment.label}</b><span>${segment.count} reviews</span></div><div class="context-axis-mini">${segment.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${oneDecimal(axis.average)}</b></span>`).join('')}</div></article>`).join('')}</div></div>`:''}
   </section>
-  <section class="context-signals">${contextSignals.length?contextSignals.slice(0,4).map(signal=>`<div class="context-signal"><span class="context-signal-mark">Δ</span><span><b>${esc(contextSignalText(signal))}</b><small>${signal.type==='mode'?'Single / Party':'Solo難易度'}の各セグメント2件以上で比較 · 差 ${signal.gap.toFixed(1)}</small></span></div>`).join(''):'<div class="catalog-empty">十分な件数のあるセグメント間で1.0点以上の差はまだありません。</div>'}</section>
+  <section class="context-signals">${contextSignals.length?contextSignals.slice(0,4).map((signal,index)=>`<div class="context-signal"><span class="context-signal-mark">Δ</span><span><b>${esc(contextSignalText(signal))}</b><small>${signal.type==='mode'?'Single / Party':'Solo難易度'}の各セグメント2件以上で比較 · 差 ${signal.gap.toFixed(1)}</small></span><button class="mini-action" data-add-context-experiment="${index}">実験に追加</button></div>`).join(''):'<div class="catalog-empty">十分な件数のあるセグメント間で1.0点以上の差はまだありません。</div>'}</section>
   <div class="lab-note">Context Signalは各比較セグメント2件以上、4軸平均の差1.0以上で表示します。少数レビューだけでは改善警告にしません。</div>
   <div class="section-head compact-head"><h2>Review Timeline</h2><span class="muted">v8.25以降の新規評価</span></div>
   ${timeline.total?`<section class="review-timeline-summary"><div><b>${timeline.total}</b><span>tracked</span></div><div><b>${timeline.currentCount}</b><span>直近30日</span></div><div><b>${timeline.previousCount}</b><span>前30日</span></div><div><b>${timeline.modes.single}/${timeline.modes.party}</b><span>Single / Party</span></div></section><section class="review-trends">${timeline.axes.map(axis=>{const label=insightAxisLabel(axis.id),delta=axis.delta;return`<div><span>${label}</span><b>${Number.isFinite(axis.currentAverage)?axis.currentAverage.toFixed(1):'—'}</b><small>${Number.isFinite(delta)?`${delta>0?'+':''}${delta.toFixed(1)} vs 前30日`:'比較データ待ち'}</small></div>`}).join('')}</section><section class="review-event-list">${timeline.recent.slice(0,6).map(event=>`<div class="review-event-row"><span><b>${event.mode==='party'?'Party':'Single'} · ${event.playerCount}人${event.difficulty?` · ${soloDifficultyLabel(event.difficulty)}`:''}</b><small>${formatPlayedAt(event.at)}</small></span><span class="review-event-scores">F ${event.scores.fun} · C ${event.scores.clarity} · B ${event.scores.brain} · R ${event.scores.replay}</span></div>`).join('')}</section>`:'<div class="catalog-empty">次に記録する4軸評価からTimelineを開始します。</div>'}
@@ -230,11 +232,32 @@ function renderGameInsights(id){
   <div class="section-head compact-head"><h2>Player Results</h2><span class="muted">勝数 / 勝率</span></div>
   <section class="insight-player-list">${insight.players.length?insight.players.map((row,index)=>`<button class="insight-player-row" data-insight-player="${encodeURIComponent(row.name)}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span><b>${esc(row.name)}</b><small>${row.plays}試合</small></span><span class="stats-value"><b>${row.wins}勝</b><small>${percent(row.winRate)}</small></span></button>`).join(''):'<div class="catalog-empty">プレイヤーデータがありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Health Findings</h2><span class="health-status ${status}">${healthStatusLabel(status)}</span></div>
-  <section class="insight-findings">${insight.health?.issues?.length?insight.health.issues.map(item=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p></div>`).join(''):'<div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div>'}</section>
+  <section class="insight-findings">${insight.health?.issues?.length?insight.health.issues.map((item,index)=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p><button class="mini-action" data-add-health-experiment="${index}">実験に追加</button></div>`).join(''):'<div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div>'}</section>
+  <div class="section-head compact-head"><h2>Improvement Queue</h2><span class="muted">${experiments.length} / 5</span></div>
+  <section class="improvement-mini-list">${experiments.length?experiments.map(item=>`<article class="improvement-mini ${item.status}"><span class="experiment-status ${item.status}">${experimentStatusLabel(item.status)}</span><span><b>${esc(item.title)}</b><small>${item.note?esc(item.note):esc(item.source.detail||item.source.action||'メモなし')}</small></span><button class="mini-action" data-cycle-experiment="${item.id}">次へ</button></article>`).join(''):'<div class="catalog-empty">改善実験はまだありません。Health FindingやContext Signalから追加できます。</div>'}</section>
+  <button class="btn quiet full" id="manualExperiment">手動で実験を追加</button>
   <div class="section-head compact-head"><h2>Recent Results</h2><span class="muted">最大10件</span></div>
   <section class="history-list">${insight.recent.length?insight.recent.map(entry=>`<div class="history-row"><span class="history-symbol">${entry.mode==='party'?'P':'S'}</span><span><b>${entry.winners.length?`勝者 ${entry.winners.map(esc).join(' & ')}`:'勝者なし'}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${entry.players.length}人</small></span><time>${formatPlayedAt(entry.at)}</time></div>`).join(''):'<div class="catalog-empty">最近の結果はありません。</div>'}</section>`;
   app.querySelector('#insightBack').onclick=()=>renderGameDetail(id);
   app.querySelectorAll('[data-insight-player]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.insightPlayer)));
+  app.querySelectorAll('[data-add-context-experiment]').forEach(button=>button.onclick=()=>{
+    const signal=contextSignals[+button.dataset.addContextExperiment];if(!signal)return;
+    const title=contextSignalText(signal),key=['context',signal.type,signal.axis,signal.high,signal.low].join(':');
+    const result=improvementQueue.add({gameId:id,title,source:{kind:'context',key,detail:title,action:'該当コンテキストのルール・説明・難易度を変更して再評価する'}});
+    toast(result.created?'改善実験を追加しました':'同じ実験は追加済みです');renderGameInsights(id);
+  });
+  app.querySelectorAll('[data-add-health-experiment]').forEach(button=>button.onclick=()=>{
+    const issue=insight.health?.issues?.[+button.dataset.addHealthExperiment];if(!issue)return;
+    const key=['health',issue.type||issue.title].join(':');
+    const result=improvementQueue.add({gameId:id,title:issue.action||issue.title,source:{kind:'health',key,detail:issue.detail||issue.title,action:issue.action}});
+    toast(result.created?'改善実験を追加しました':'同じ実験は追加済みです');renderGameInsights(id);
+  });
+  app.querySelectorAll('[data-cycle-experiment]').forEach(button=>button.onclick=()=>{improvementQueue.cycle(button.dataset.cycleExperiment);renderGameInsights(id)});
+  app.querySelector('#manualExperiment').onclick=()=>{
+    const title=prompt('試したい改善案');if(!title?.trim())return;
+    const note=prompt('検証メモ（任意）','')||'';
+    improvementQueue.add({gameId:id,title:title.trim(),note,source:{kind:'manual'}});renderGameInsights(id);
+  };
 }
 
 function renderGameDetail(id,difficulty='normal'){
@@ -279,6 +302,7 @@ function renderHome(){
   const profileRows=buildPlayerProfiles(statEntries,partyEntries);
   const achievementData=achievementSummary(profileRows);
   const currentSeason=buildSeasonView(currentSeasonKey(),statEntries,partyEntries);
+  const improvementSummary=improvementQueue.summary(validIds);
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
@@ -301,6 +325,7 @@ function renderHome(){
   <section class="playtest-entry season-entry"><div><div class="eyebrow">SEASON BOARD · ${esc(currentSeason.label)}</div><h3>${currentSeason.rows.length?`${esc(currentSeason.rows[0].name)}が${currentSeason.rows[0].wins}勝で首位`:'今月のランキングを始める'}</h3><p>${currentSeason.totalPlays}試合 · ${currentSeason.partySessions} Party · ${currentSeason.players} players。前月との差も自動比較します。</p></div><button class="btn quiet" id="seasonBoard">月間順位</button></section>
   <section class="playtest-entry achievement-entry"><div><div class="eyebrow">ACHIEVEMENTS</div><h3>${achievementData.unlocked} badges unlocked</h3><p>${achievementData.players?`${achievementData.players}人の実績を履歴から自動判定。${achievementData.leader?` 現在トップは${esc(achievementData.leader.name)}の${achievementData.leader.unlocked}個。`:''}`:'プレイすると実績と次のMilestoneが自動で増えていきます。'}</p></div><button class="btn quiet" id="achievements">実績を見る</button></section>
   <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
+  <section class="playtest-entry improvement-entry"><div><div class="eyebrow">IMPROVEMENT QUEUE</div><h3>${improvementSummary.testing} testing · ${improvementSummary.planned} planned</h3><p>HealthやContext Signalから改善実験を作り、PLANNED → TESTING → DONEまで追跡します。</p></div><button class="btn quiet" id="improvementQueue">実験を見る</button></section>
   <section class="playtest-entry data-entry"><div><div class="eyebrow">DATA VAULT</div><h3>端末データをバックアップ</h3><p>プレイヤー・履歴・評価・お気に入り・Solo進捗をJSONへ保存し、別端末でも復元できます。</p></div><button class="btn quiet" id="dataVault">管理する</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
@@ -354,6 +379,7 @@ function renderHome(){
   app.querySelector('#seasonBoard').onclick=()=>renderSeasonBoard(currentSeasonKey());
   app.querySelector('#achievements').onclick=renderAchievements;
   app.querySelector('#gameHealth').onclick=renderGameHealth;
+  app.querySelector('#improvementQueue').onclick=renderImprovementQueue;
   app.querySelector('#dataVault').onclick=renderDataVault;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
@@ -553,6 +579,25 @@ function renderGameHealth(){
 
   app.querySelector('#healthBack').onclick=renderHome;
   app.querySelectorAll('.health-card-head[data-insight-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.insightGame));
+}
+
+function renderImprovementQueue(){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g])),rows=improvementQueue.all(ids),summary=improvementQueue.summary(ids);
+  updateBadge('IMPROVEMENT QUEUE');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="queueBack">←</button><div><div class="eyebrow">IMPROVEMENT QUEUE</div><div class="screen-title">改善実験</div></div></div>
+  <section class="health-summary improvement-summary"><div><b>${summary.testing}</b><span>TESTING</span></div><div><b>${summary.planned}</b><span>PLANNED</span></div><div><b>${summary.done}</b><span>DONE</span></div><div><b>${summary.games}</b><span>games</span></div></section>
+  <div class="lab-note">状態ボタンを押すと PLANNED → TESTING → DONE → PLANNED の順に進みます。各ゲーム最大5件で、上限時は完了済みまたは最古の項目から入れ替わります。</div>
+  <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p></div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentStatusLabel(item.status)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
+  app.querySelector('#queueBack').onclick=renderHome;
+  app.querySelectorAll('[data-queue-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.queueGame));
+  app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{improvementQueue.cycle(button.dataset.queueCycle);renderImprovementQueue()});
+  app.querySelectorAll('[data-queue-note]').forEach(button=>button.onclick=()=>{
+    const item=rows.find(row=>row.id===button.dataset.queueNote);if(!item)return;
+    const note=prompt('検証メモ',item.note||item.source.action||'');if(note==null)return;
+    improvementQueue.update(item.id,{note});renderImprovementQueue();
+  });
+  app.querySelectorAll('[data-queue-delete]').forEach(button=>button.onclick=()=>{if(!confirm('この改善実験を削除しますか？'))return;improvementQueue.remove(button.dataset.queueDelete);renderImprovementQueue()});
 }
 
 function formatBytes(bytes){
