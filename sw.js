@@ -1,4 +1,4 @@
-const CACHE_NAME='party-pocket-v8.31.0';
+const CACHE_NAME='party-pocket-v8.32.0';
 const APP_SHELL=[
   './',
   './index.html',
@@ -34,6 +34,7 @@ const APP_SHELL=[
   './src/core/improvement-queue.js',
   './src/core/experiment-evaluation.js',
   './src/core/experiment-learnings.js',
+  './src/core/learned-recommendations.js',
   './src/games/sync.js',
   './src/games/bomb.js',
   './src/games/five.js',
