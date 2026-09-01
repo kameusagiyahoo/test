@@ -12,9 +12,14 @@ function short(value,max=28){
 }
 function safeNumber(value){return Number.isFinite(Number(value))?Number(value):0}
 function rankScores(scores=[]){
-  return scores.map((score,index)=>({score:safeNumber(score),index}))
-    .sort((a,b)=>b.score-a.score||a.index-b.index)
-    .map((row,i,rows)=>({...row,rank:i===0?1:(row.score===rows[i-1].score?rows[i-1].rank:i+1)}));
+  const rows=scores.map((score,index)=>({score:safeNumber(score),index}))
+    .sort((a,b)=>b.score-a.score||a.index-b.index);
+  let previousScore=null,previousRank=0;
+  return rows.map((row,i)=>{
+    const rank=i===0?1:(row.score===previousScore?previousRank:i+1);
+    previousScore=row.score;previousRank=rank;
+    return{...row,rank};
+  });
 }
 function font(size,weight=500){
   return `font-family="-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',Arial,sans-serif";font-size:${size}px;font-weight:${weight}`;
