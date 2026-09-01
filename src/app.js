@@ -21,6 +21,7 @@ import {PlaytestEventStore,buildPlaytestSegments,buildPlaytestTimeline,contextua
 import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
 import {ImprovementQueueStore,experimentStatusLabel} from './core/improvement-queue.js';
 import {buildExperimentBaseline,evaluateExperiment,experimentOutcomeLabel} from './core/experiment-evaluation.js';
+import {buildExperimentLearnings,experimentSourceLabel} from './core/experiment-learnings.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -62,7 +63,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.30.1';
+const APP_VERSION='8.31.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -343,7 +344,7 @@ function renderHome(){
   const profileRows=buildPlayerProfiles(statEntries,partyEntries);
   const achievementData=achievementSummary(profileRows);
   const currentSeason=buildSeasonView(currentSeasonKey(),statEntries,partyEntries);
-  const improvementSummary=improvementQueue.summary(validIds);
+  const improvementRows=improvementQueue.all(validIds),improvementSummary=improvementQueue.summary(validIds),learningSummary=buildExperimentLearnings(improvementRows);
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
@@ -367,6 +368,7 @@ function renderHome(){
   <section class="playtest-entry achievement-entry"><div><div class="eyebrow">ACHIEVEMENTS</div><h3>${achievementData.unlocked} badges unlocked</h3><p>${achievementData.players?`${achievementData.players}人の実績を履歴から自動判定。${achievementData.leader?` 現在トップは${esc(achievementData.leader.name)}の${achievementData.leader.unlocked}個。`:''}`:'プレイすると実績と次のMilestoneが自動で増えていきます。'}</p></div><button class="btn quiet" id="achievements">実績を見る</button></section>
   <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
   <section class="playtest-entry improvement-entry"><div><div class="eyebrow">IMPROVEMENT QUEUE</div><h3>${improvementSummary.testing} testing · ${improvementSummary.planned} planned</h3><p>HealthやContext Signalから改善実験を作り、PLANNED → TESTING → DONEまで追跡します。</p></div><button class="btn quiet" id="improvementQueue">実験を見る</button></section>
+  <section class="playtest-entry learning-entry"><div><div class="eyebrow">EXPERIMENT LEARNINGS</div><h3>${learningSummary.completed?`${learningSummary.improved}/${learningSummary.completed} improved`:'完了実験から学びを蓄積'}</h3><p>${learningSummary.completed?`改善率 ${Math.round((learningSummary.successRate||0)*100)}% · 平均Quality差 ${Number.isFinite(learningSummary.averageQualityDelta)?(learningSummary.averageQualityDelta>0?'+':'')+learningSummary.averageQualityDelta.toFixed(1):'—'}`:'Before/After評価が完了すると、効いた改善と失敗した改善を横断比較できます。'}</p></div><button class="btn quiet" id="experimentLearnings">学びを見る</button></section>
   <section class="playtest-entry data-entry"><div><div class="eyebrow">DATA VAULT</div><h3>端末データをバックアップ</h3><p>プレイヤー・履歴・評価・お気に入り・Solo進捗をJSONへ保存し、別端末でも復元できます。</p></div><button class="btn quiet" id="dataVault">管理する</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
   <section class="recommend-grid" id="recommendGrid">${recommendedGames(games,session.players.length).map(recommendationHtml).join('')}</section>
@@ -421,6 +423,7 @@ function renderHome(){
   app.querySelector('#achievements').onclick=renderAchievements;
   app.querySelector('#gameHealth').onclick=renderGameHealth;
   app.querySelector('#improvementQueue').onclick=renderImprovementQueue;
+  app.querySelector('#experimentLearnings').onclick=renderExperimentLearnings;
   app.querySelector('#dataVault').onclick=renderDataVault;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
   const catalogIndex=new Map(games.map((g,i)=>[g.id,i]));
@@ -622,15 +625,43 @@ function renderGameHealth(){
   app.querySelectorAll('.health-card-head[data-insight-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.insightGame));
 }
 
+function renderExperimentLearnings(){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
+  const report=buildExperimentLearnings(improvementQueue.all(ids));
+  updateBadge('EXPERIMENT LEARNINGS');
+  const quality=value=>Number.isFinite(value)?`${value>0?'+':''}${value.toFixed(1)}`:'—';
+  const sourceCards=report.sources.map(row=>`<article class="learning-source"><div><b>${experimentSourceLabel(row.source)}</b><span>${row.completed} completed</span></div><div class="learning-source-metrics"><span><b>${row.improved}</b><small>improved</small></span><span><b>${row.worse}</b><small>worse</small></span><span><b>${quality(row.averageQualityDelta)}</b><small>avg Δ</small></span></div></article>`).join('');
+  const experimentRow=row=>{const game=byId.get(row.gameId);return`<button class="learning-experiment ${row.outcome}" data-learning-game="${row.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(row.title)}</b><small>${esc(game?.title||row.gameId)} · ${experimentSourceLabel(row.source)} · ${esc(row.cohort)}</small></span><span class="learning-delta">${quality(row.qualityDelta)}<small>Quality</small></span></button>`};
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="learningBack">←</button><div><div class="eyebrow">EXPERIMENT LEARNINGS</div><div class="screen-title">改善から得た学び</div></div></div>
+  <section class="learning-summary"><div><b>${report.completed}</b><span>evaluated</span></div><div><b>${report.improved}</b><span>improved</span></div><div><b>${report.completed?Math.round((report.successRate||0)*100)+'%':'—'}</b><span>success rate</span></div><div><b>${quality(report.averageQualityDelta)}</b><span>avg Quality Δ</span></div></section>
+  <div class="lab-note">DONEかつBefore/After判定済みの実験だけを集計します。QualityはFun / Clarity / Replayの平均で、Brain Loadは成功率に含めません。</div>
+  <div class="section-head compact-head"><h2>By Source</h2><span class="muted">改善案の起点</span></div>
+  <section class="learning-sources">${sourceCards}</section>
+  <div class="section-head compact-head"><h2>By Game</h2><span class="muted">改善実績</span></div>
+  <section class="learning-games">${report.games.length?report.games.map(row=>{const game=byId.get(row.gameId);return`<button class="learning-game" data-learning-game="${row.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||row.gameId)}</b><small>${row.completed}実験 · improved ${row.improved} / worse ${row.worse}</small></span><span class="learning-delta">${quality(row.averageQualityDelta)}<small>avg Δ</small></span></button>`}).join(''):'<div class="catalog-empty">判定済みの実験はまだありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>What Worked</h2><span class="muted">Quality改善順</span></div>
+  <section class="learning-list">${report.wins.length?report.wins.slice(0,8).map(experimentRow).join(''):'<div class="catalog-empty">IMPROVEDになった実験はまだありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>What Did Not Work</h2><span class="muted">悪化幅の大きい順</span></div>
+  <section class="learning-list">${report.misses.length?report.misses.slice(0,8).map(experimentRow).join(''):'<div class="catalog-empty">WORSEになった実験はありません。</div>'}</section>
+  ${report.flats.length?`<div class="section-head compact-head"><h2>Flat</h2><span class="muted">大きな変化なし</span></div><section class="learning-list">${report.flats.slice(0,6).map(experimentRow).join('')}</section>`:''}
+  ${report.doneWithoutResult?`<div class="lab-note">${report.doneWithoutResult}件の旧DONE実験はBefore/After結果がないため集計対象外です。</div>`:''}
+  <button class="btn quiet full" id="learningQueue">Improvement Queueへ</button>`;
+  app.querySelector('#learningBack').onclick=renderHome;
+  app.querySelector('#learningQueue').onclick=renderImprovementQueue;
+  app.querySelectorAll('[data-learning-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.learningGame));
+}
+
 function renderImprovementQueue(){
   disposeActiveGame();
   const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g])),rows=improvementQueue.all(ids),summary=improvementQueue.summary(ids);
   updateBadge('IMPROVEMENT QUEUE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="queueBack">←</button><div><div class="eyebrow">IMPROVEMENT QUEUE</div><div class="screen-title">改善実験</div></div></div>
   <section class="health-summary improvement-summary"><div><b>${summary.testing}</b><span>TESTING</span></div><div><b>${summary.planned}</b><span>PLANNED</span></div><div><b>${summary.done}</b><span>DONE</span></div><div><b>${summary.games}</b><span>games</span></div></section>
-  <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。条件を満たすまでDONEには進めず、DONE時点の結果を固定保存します。</div>
+  <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。条件を満たすまでDONEには進めず、DONE時点の結果を固定保存します。</div><button class="btn quiet full" id="queueLearnings">完了実験の学びを見る</button>
   <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId),result=experimentEvaluation(item);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p>${result?`<section class="experiment-result ${experimentOutcomeClass(result)}"><div class="experiment-result-head"><b>${experimentOutcomeLabel(result.outcome)}</b><span>${esc(result.cohort?.label||'All reviews')}</span></div><div class="experiment-result-counts"><span>Before ${result.baselineCount}</span><span>After ${result.afterCount}</span><span>必要 After 3</span></div><div class="experiment-axis-deltas">${result.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${Number.isFinite(axis.delta)?`${axis.delta>0?'+':''}${axis.delta.toFixed(1)}`:'—'}</b></span>`).join('')}</div></section>`:''}</div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentAdvanceLabel(item)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
   app.querySelector('#queueBack').onclick=renderHome;
+  app.querySelector('#queueLearnings').onclick=renderExperimentLearnings;
   app.querySelectorAll('[data-queue-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.queueGame));
   app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{advanceExperiment(button.dataset.queueCycle);renderImprovementQueue()});
   app.querySelectorAll('[data-queue-note]').forEach(button=>button.onclick=()=>{
