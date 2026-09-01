@@ -21,6 +21,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Stats + Party HistoryからPlayer Profile / Recordsを自動集計
 - Achievements / Milestonesを履歴から自動判定し、進捗付きで表示
 - Party RecapとPlayer Profileを端末内生成PNGとして共有可能
+- Season Boardで月ごとの勝利数・Party優勝・MVP・前月差を表示
 
 ## Games
 
@@ -149,6 +150,16 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - iPhoneではWeb Share API対応時に共有シートへ渡す
 - 共有非対応環境ではPNG保存へフォールバック
 - 8人Partyでも画像下端を超えないよう、ラウンド表示件数を自動調整
+
+## Season Board / Monthly Leaderboard
+- 新しい保存形式は作らずStats + Party Historyを月単位でフィルタして集計
+- 月間順位は 勝利数 → Party総合優勝 → MVP → 勝率 → 試合数 の順
+- 月ごとに記録試合 / Party数 / players / 遊んだゲーム数を表示
+- プレイヤーごとに勝数 / 勝率 / Party優勝 / MVP / Party ptを表示
+- 前月の同一プレイヤーと比較して勝数差を表示
+- 過去月を最大12か月タブで切り替え
+- 上位3人をTOP 3として表示
+- 月間順位から既存Player Profileへ移動可能
 
 ## Modes
 
@@ -279,6 +290,7 @@ src/
 │  ├ player-profile.js
 │  ├ achievements.js
 │  ├ share-card.js
+│  ├ season.js
 │  └ transport.js
 └ games/
    ├ sync.js
