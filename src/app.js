@@ -202,7 +202,7 @@ function experimentAdvanceLabel(item){
   if(item.status==='planned')return'テスト開始';
   if(item.status==='testing'){
     const result=experimentEvaluation(item);
-    return result?.ready?'評価して完了':'完了';
+    return result?.ready?'評価して完了':`After ${result?.afterCount||0}/3`;
   }
   return'再計画';
 }
@@ -219,14 +219,16 @@ function advanceExperiment(id){
   const item=improvementQueue.all().find(row=>row.id===id);if(!item)return null;
   if(item.status==='planned'){
     const startedAt=Date.now(),baseline=buildExperimentBaseline(item.source,playtestEvents.forGame(item.gameId),startedAt);
+    if(baseline.count<2){toast(`Baselineが不足しています · ${baseline.count}/2 reviews`);return item}
     const updated=improvementQueue.startTesting(id,baseline);
     toast(`TESTING開始 · Baseline ${baseline.count}件`);
     return updated;
   }
   if(item.status==='testing'){
     const result=evaluateExperiment(item,playtestEvents.forGame(item.gameId));
+    if(!result.ready){toast(`Afterレビューを集めてください · ${result.afterCount}/3`);return item}
     const updated=improvementQueue.complete(id,result);
-    toast(result.ready?`実験結果: ${experimentOutcomeLabel(result.outcome)}`:'判定材料不足のまま完了しました');
+    toast(`実験結果: ${experimentOutcomeLabel(result.outcome)}`);
     return updated;
   }
   const updated=improvementQueue.reset(id);toast('PLANNEDへ戻しました');return updated;
@@ -626,7 +628,7 @@ function renderImprovementQueue(){
   updateBadge('IMPROVEMENT QUEUE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="queueBack">←</button><div><div class="eyebrow">IMPROVEMENT QUEUE</div><div class="screen-title">改善実験</div></div></div>
   <section class="health-summary improvement-summary"><div><b>${summary.testing}</b><span>TESTING</span></div><div><b>${summary.planned}</b><span>PLANNED</span></div><div><b>${summary.done}</b><span>DONE</span></div><div><b>${summary.games}</b><span>games</span></div></section>
-  <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。DONE時点の結果を固定保存します。</div>
+  <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。条件を満たすまでDONEには進めず、DONE時点の結果を固定保存します。</div>
   <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId),result=experimentEvaluation(item);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p>${result?`<section class="experiment-result ${experimentOutcomeClass(result)}"><div class="experiment-result-head"><b>${experimentOutcomeLabel(result.outcome)}</b><span>${esc(result.cohort?.label||'All reviews')}</span></div><div class="experiment-result-counts"><span>Before ${result.baselineCount}</span><span>After ${result.afterCount}</span><span>必要 After 3</span></div><div class="experiment-axis-deltas">${result.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${Number.isFinite(axis.delta)?`${axis.delta>0?'+':''}${axis.delta.toFixed(1)}`:'—'}</b></span>`).join('')}</div></section>`:''}</div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentAdvanceLabel(item)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
   app.querySelector('#queueBack').onclick=renderHome;
   app.querySelectorAll('[data-queue-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.queueGame));
