@@ -512,11 +512,11 @@ function renderGameHealth(){
   <div class="lab-note">誤判定を避けるため、評価系は新4軸評価2件以上、勝率偏りは5試合以上かつ対象プレイヤー4試合以上・勝率75%以上でのみ警告します。</div>
   <section class="health-list">${report.priority.map(row=>{
     const game=byId.get(row.gameId),primary=row.issues[0];
-    return`<article class="health-card ${row.status}"><button class="health-card-head" data-game="${row.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||row.gameId)}</b><small>${row.plays}試合 · 新4軸評価 ${row.reviews}件</small></span><span class="health-status ${row.status}">${healthStatusLabel(row.status)}</span></button>${row.issues.length?`<div class="health-issues">${row.issues.map(item=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p></div>`).join('')}</div>`:'<div class="health-issues"><div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div></div>'}</article>`;
+    return`<article class="health-card ${row.status}"><button class="health-card-head" data-insight-game="${row.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||row.gameId)}</b><small>${row.plays}試合 · 新4軸評価 ${row.reviews}件</small></span><span class="health-status ${row.status}">${healthStatusLabel(row.status)}</span></button>${row.issues.length?`<div class="health-issues">${row.issues.map(item=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p></div>`).join('')}</div>`:'<div class="health-issues"><div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div></div>'}</article>`;
   }).join('')}</section>`;
 
   app.querySelector('#healthBack').onclick=renderHome;
-  app.querySelectorAll('.health-card-head[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+  app.querySelectorAll('.health-card-head[data-insight-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.insightGame));
 }
 
 function formatBytes(bytes){
