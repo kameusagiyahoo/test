@@ -13,6 +13,7 @@ import {PlayerGroupStore,samePlayers} from './core/groups.js';
 import {SavedPartyStore} from './core/party-presets.js';
 import {PartyHistoryStore,partyLeadChanges,partyMvp} from './core/party-history.js';
 import {buildPlayerProfile,buildPlayerProfiles,topPlayerRecords} from './core/player-profile.js';
+import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,unlockedAchievements} from './core/achievements.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -52,7 +53,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.20.0';
+const APP_VERSION='8.21.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -176,6 +177,8 @@ function renderHome(){
   const groups=playerGroups.recent();
   const partyPresets=savedParties.recent(validIds);
   const recentParties=partyHistory.history(validIds).slice(0,3);
+  const profileRows=buildPlayerProfiles(stats.history().filter(e=>validIds.includes(e.gameId)),partyHistory.history(validIds));
+  const achievementData=achievementSummary(profileRows);
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
@@ -195,6 +198,7 @@ function renderHome(){
   ${session.players.length===1&&dailyGame?`<section class="solo-daily ${daily.cleared?'cleared':''}"><div><div class="eyebrow">DAILY SOLO</div><h3>${dailyGame.emoji} ${dailyGame.title}</h3><p>${daily.maxRounds}ラウンド以内に5点到達でクリア。</p><div class="solo-daily-meta"><span>${daily.cleared?'今日クリア済み':'今日の挑戦'}</span><span>連続 ${daily.streak}日</span><span>Solo完走 ${soloSummary.totalClears}回</span></div></div><button class="btn primary" id="dailySolo">${daily.cleared?'もう一度':'挑戦する'}</button></section><div class="section-head"><h2>Solo Progress</h2><span class="muted">自己ベスト</span></div><section class="solo-progress-list">${SOLO_GAME_IDS.map(id=>{const g=byId.get(id),p=soloProgress.game(id);return`<button class="solo-progress-row" data-game="${id}"><span class="recommend-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||id)}</b><small>最短 ${p?.bestRounds??'—'}ラウンド · 連続成功 ${p?.bestStreak||0} · 完走 ${p?.clears||0}回</small></span><span class="recommend-arrow">→</span></button>`}).join('')}</section>`:''}
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>24ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
+  <section class="playtest-entry achievement-entry"><div><div class="eyebrow">ACHIEVEMENTS</div><h3>${achievementData.unlocked} badges unlocked</h3><p>${achievementData.players?`${achievementData.players}人の実績を履歴から自動判定。${achievementData.leader?` 現在トップは${esc(achievementData.leader.name)}の${achievementData.leader.unlocked}個。`:''}`:'プレイすると実績と次のMilestoneが自動で増えていきます。'}</p></div><button class="btn quiet" id="achievements">実績を見る</button></section>
   <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
   <section class="playtest-entry data-entry"><div><div class="eyebrow">DATA VAULT</div><h3>端末データをバックアップ</h3><p>プレイヤー・履歴・評価・お気に入り・Solo進捗をJSONへ保存し、別端末でも復元できます。</p></div><button class="btn quiet" id="dataVault">管理する</button></section>
   <div class="section-head"><h2>For this group</h2><span class="muted">${session.players.length}人向け</span></div>
@@ -246,6 +250,7 @@ function renderHome(){
   if(app.querySelector('.solo-progress-list'))bindGameLaunch(app.querySelector('.solo-progress-list'));
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
+  app.querySelector('#achievements').onclick=renderAchievements;
   app.querySelector('#gameHealth').onclick=renderGameHealth;
   app.querySelector('#dataVault').onclick=renderDataVault;
   const catalogState={category:'all',query:'',difficulty:'all',maxMinutes:'all',playerCount:session.players.length,recommendedOnly:true};
@@ -361,13 +366,17 @@ function renderPlayerProfile(name){
   const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
   const profile=buildPlayerProfile(name,stats.history().filter(e=>ids.includes(e.gameId)),partyHistory.history(ids));
   if(!profile.plays&&!profile.partySessions)return renderStatsDashboard();
-  const topGames=profile.gameStats.slice(0,3);
+  const topGames=profile.gameStats.slice(0,3),badges=playerAchievements(profile),unlocked=unlockedAchievements(profile),next=nextMilestones(profile,3);
   updateBadge('PLAYER PROFILE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="profileBack">←</button><div><div class="eyebrow">PLAYER PROFILE</div><div class="screen-title">${esc(profile.name)}</div></div></div>
   <section class="profile-hero"><div class="profile-monogram">${esc(profile.name.slice(0,1).toUpperCase())}</div><div><div class="eyebrow">CAREER</div><h2>${esc(profile.name)}</h2><p>${profile.plays}試合 · ${profile.wins}勝 · 勝率 ${percent(profile.winRate)}</p></div></section>
   <section class="profile-kpis"><div><b>${profile.plays}</b><span>games</span></div><div><b>${profile.wins}</b><span>wins</span></div><div><b>${percent(profile.winRate)}</b><span>win rate</span></div><div><b>${profile.gamesPlayed}</b><span>titles</span></div></section>
   <div class="section-head compact-head"><h2>Party Career</h2><span class="muted">完了Party単位</span></div>
   <section class="profile-kpis party-kpis"><div><b>${profile.partySessions}</b><span>Party</span></div><div><b>${profile.partyWins}</b><span>Party wins</span></div><div><b>${profile.mvpCount}</b><span>MVP</span></div><div><b>${profile.partyPoints}</b><span>Party pt</span></div></section>
+  <div class="section-head compact-head"><h2>Achievements</h2><span class="muted">${unlocked.length} / ${badges.length} unlocked</span></div>
+  <section class="achievement-badges">${unlocked.length?unlocked.map(row=>`<div class="achievement-badge ${row.tier}"><span class="achievement-symbol">${esc(row.symbol)}</span><span><b>${esc(row.title)}</b><small>${esc(row.description)}</small></span></div>`).join(''):'<div class="catalog-empty">まだ解除済み実績はありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Next Milestones</h2><span class="muted">達成に近い順</span></div>
+  <section class="milestone-list">${next.length?next.map(row=>`<div class="milestone-row"><span class="achievement-symbol locked">${esc(row.symbol)}</span><span><b>${esc(row.title)}</b><small>${esc(row.description)} · ${row.current}/${row.target}</small><span class="milestone-track"><i style="width:${Math.round(row.progress*100)}%"></i></span></span><strong>${Math.round(row.progress*100)}%</strong></div>`).join(''):'<div class="catalog-empty">すべての実績を解除しています。</div>'}</section>
   <div class="section-head compact-head"><h2>Best Games</h2><span class="muted">勝数 → 勝率</span></div>
   <section class="profile-game-list">${topGames.length?topGames.map((row,index)=>{const g=byId.get(row.gameId);return`<button class="profile-game-row" data-game="${row.gameId}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span class="lab-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||row.gameId)}</b><small>${row.plays}試合 · ${row.wins}勝</small></span><span class="stats-value"><b>${percent(row.winRate)}</b><small>win rate</small></span></button>`}).join(''):'<div class="catalog-empty">ゲーム別データがありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Rivals</h2><span class="muted">Party最終スコア比較</span></div>
@@ -377,6 +386,20 @@ function renderPlayerProfile(name){
   app.querySelector('#profileBack').onclick=renderStatsDashboard;
   app.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
   app.querySelectorAll('[data-profile-party]').forEach(button=>button.onclick=()=>renderPartyHistoryDetail(button.dataset.profileParty));
+}
+
+function renderAchievements(){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id);
+  const profiles=buildPlayerProfiles(stats.history().filter(e=>ids.includes(e.gameId)),partyHistory.history(ids));
+  const board=achievementBoard(profiles),summary=achievementSummary(profiles);
+  updateBadge('ACHIEVEMENTS');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="achievementBack">←</button><div><div class="eyebrow">ACHIEVEMENTS</div><div class="screen-title">実績とMilestones</div></div></div>
+  <section class="achievement-summary"><div><b>${summary.unlocked}</b><span>unlocked</span></div><div><b>${summary.players}</b><span>players</span></div><div><b>${summary.possible}</b><span>possible</span></div></section>
+  <div class="lab-note">StatsとParty Historyから毎回再計算します。勝率系ではなく、プレイ・勝利・Party・MVP・ゲーム幅・対戦継続などの到達実績です。</div>
+  <section class="achievement-board">${board.length?board.map((row,index)=>{const profile=profiles.find(p=>p.name===row.name),badges=unlockedAchievements(profile);return`<button class="achievement-player" data-achievement-player="${encodeURIComponent(row.name)}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span><b>${esc(row.name)}</b><small>${row.unlocked}/${row.total} badges · ${row.plays}試合</small><span class="mini-badges">${badges.slice(-6).map(a=>`<i class="${a.tier}">${esc(a.symbol)}</i>`).join('')||'<em>まだ実績なし</em>'}</span></span><span class="achievement-next">${row.next?`次: ${esc(row.next.title)}<small>${row.next.current}/${row.next.target}</small>`:'COMPLETE'}</span></button>`}).join(''):'<div class="catalog-empty">まだ実績データがありません。</div>'}</section>`;
+  app.querySelector('#achievementBack').onclick=renderHome;
+  app.querySelectorAll('[data-achievement-player]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.achievementPlayer)));
 }
 
 function healthStatusLabel(status){
