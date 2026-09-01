@@ -27,6 +27,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Solo 3ゲームにEasy / Normal / Hardを追加し、難易度別自己ベストとDaily難易度を管理
 - Solo Analyticsで難易度別の完走数・平均R・最短R・pt/Rを比較
 - Contextual Playtest SegmentsでSingle/Party・Solo難易度別の4軸評価差を比較
+- Improvement QueueでHealth / Context Signalを改善実験として追跡
 
 ## Games
 
@@ -208,6 +209,17 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 既存の累積Playtest平均やHealth判定は変更せず、Context Signalは補助的な改善材料として扱う
 - 新しい保存形式は追加せず、既存Playtest Eventから都度算出
 
+## Game Improvement Queue / Experiments
+- Game InsightsのHealth Finding / Context Signalから1タップで改善実験を追加
+- 手動の改善案も追加可能
+- 状態は PLANNED → TESTING → DONE の3段階
+- 各ゲーム最大5件。上限時はDONEまたは最古の項目から入れ替え
+- 同じHealth / Context Signalはsource keyで重複登録を防止
+- 実験にはタイトル / 検証メモ / 元の根拠 / 推奨アクション / 更新日時を保存
+- HomeにImprovement Queue入口とplanned/testing件数を表示
+- 全ゲーム横断のQueue画面から状態変更 / メモ編集 / 削除 / Game Insightsへの移動が可能
+- Data Vaultバックアップ対象
+
 ## Modes
 
 ### Solo Challenge
@@ -348,6 +360,7 @@ src/
 │  ├ game-insights.js
 │  ├ playtest-events.js
 │  ├ solo-analytics.js
+│  ├ improvement-queue.js
 │  └ transport.js
 └ games/
    ├ sync.js

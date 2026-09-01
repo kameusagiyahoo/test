@@ -119,3 +119,16 @@ test('contextual playtest events are included and JSON-validated in Data Vault',
   const broken={...backup,data:{...backup.data,partyPocketPlaytestEventsV1:'not-json'}};
   assert.throws(()=>validateBackup(broken),/invalid JSON/);
 });
+
+test('improvement experiment queue is included and JSON-validated in Data Vault',()=>{
+  const storage=memoryStorage({
+    partyPocketImprovementQueueV1:JSON.stringify([{
+      id:'e1',gameId:'code',title:'説明を短くする',note:'',source:{kind:'health',key:'health:clarity'},status:'testing',createdAt:1,updatedAt:2,completedAt:0
+    }])
+  });
+  const backup=createBackup(storage,{appVersion:'8.29.0'});
+  assert.ok(backup.data.partyPocketImprovementQueueV1);
+  assert.doesNotThrow(()=>validateBackup(backup));
+  const broken={...backup,data:{...backup.data,partyPocketImprovementQueueV1:'not-json'}};
+  assert.throws(()=>validateBackup(broken),/invalid JSON/);
+});
