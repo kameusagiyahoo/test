@@ -20,6 +20,7 @@ import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insi
 import {PlaytestEventStore,buildPlaytestSegments,buildPlaytestTimeline,contextualPlaytestSignals} from './core/playtest-events.js';
 import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
 import {ImprovementQueueStore,experimentStatusLabel} from './core/improvement-queue.js';
+import {buildExperimentBaseline,evaluateExperiment,experimentOutcomeLabel} from './core/experiment-evaluation.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -61,7 +62,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.29.0';
+const APP_VERSION='8.30.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -192,6 +193,44 @@ function contextSignalText(signal){
   const names={single:'Single',party:'Party',easy:'Easy',normal:'Normal',hard:'Hard'};
   return `${names[signal.low]||signal.low}の${axis}が${names[signal.high]||signal.high}より${signal.gap.toFixed(1)}低い`;
 }
+function experimentEvaluation(item){
+  if(!item||item.status==='planned')return null;
+  if(item.status==='done'&&item.finalResult)return item.finalResult;
+  return evaluateExperiment(item,playtestEvents.forGame(item.gameId));
+}
+function experimentAdvanceLabel(item){
+  if(item.status==='planned')return'テスト開始';
+  if(item.status==='testing'){
+    const result=experimentEvaluation(item);
+    return result?.ready?'評価して完了':'完了';
+  }
+  return'再計画';
+}
+function experimentOutcomeClass(result){
+  return result?.outcome==='improved'?'improved':result?.outcome==='worse'?'worse':result?.outcome==='flat'?'flat':'collecting';
+}
+function experimentResultSummary(item){
+  const result=experimentEvaluation(item);
+  if(!result)return'';
+  const delta=Number.isFinite(result.qualityDelta)?`${result.qualityDelta>0?'+':''}${result.qualityDelta.toFixed(1)}`:'—';
+  return `${experimentOutcomeLabel(result.outcome)} · Before ${result.baselineCount} / After ${result.afterCount} · Quality ${delta}`;
+}
+function advanceExperiment(id){
+  const item=improvementQueue.all().find(row=>row.id===id);if(!item)return null;
+  if(item.status==='planned'){
+    const startedAt=Date.now(),baseline=buildExperimentBaseline(item.source,playtestEvents.forGame(item.gameId),startedAt);
+    const updated=improvementQueue.startTesting(id,baseline);
+    toast(`TESTING開始 · Baseline ${baseline.count}件`);
+    return updated;
+  }
+  if(item.status==='testing'){
+    const result=evaluateExperiment(item,playtestEvents.forGame(item.gameId));
+    const updated=improvementQueue.complete(id,result);
+    toast(result.ready?`実験結果: ${experimentOutcomeLabel(result.outcome)}`:'判定材料不足のまま完了しました');
+    return updated;
+  }
+  const updated=improvementQueue.reset(id);toast('PLANNEDへ戻しました');return updated;
+}
 function soloDifficultyDetail(gameId,difficulty){
   const level=normalizeSoloDifficulty(difficulty);
   const details={
@@ -234,7 +273,7 @@ function renderGameInsights(id){
   <div class="section-head compact-head"><h2>Health Findings</h2><span class="health-status ${status}">${healthStatusLabel(status)}</span></div>
   <section class="insight-findings">${insight.health?.issues?.length?insight.health.issues.map((item,index)=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p><button class="mini-action" data-add-health-experiment="${index}">実験に追加</button></div>`).join(''):'<div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div>'}</section>
   <div class="section-head compact-head"><h2>Improvement Queue</h2><span class="muted">${experiments.length} / 5</span></div>
-  <section class="improvement-mini-list">${experiments.length?experiments.map(item=>`<article class="improvement-mini ${item.status}"><span class="experiment-status ${item.status}">${experimentStatusLabel(item.status)}</span><span><b>${esc(item.title)}</b><small>${item.note?esc(item.note):esc(item.source.detail||item.source.action||'メモなし')}</small></span><button class="mini-action" data-cycle-experiment="${item.id}">次へ</button></article>`).join(''):'<div class="catalog-empty">改善実験はまだありません。Health FindingやContext Signalから追加できます。</div>'}</section>
+  <section class="improvement-mini-list">${experiments.length?experiments.map(item=>{const result=experimentEvaluation(item);return`<article class="improvement-mini ${item.status}"><span class="experiment-status ${item.status}">${experimentStatusLabel(item.status)}</span><span><b>${esc(item.title)}</b><small>${item.note?esc(item.note):esc(item.source.detail||item.source.action||'メモなし')}</small>${result?`<small class="experiment-result-line ${experimentOutcomeClass(result)}">${esc(experimentResultSummary(item))}</small>`:''}</span><button class="mini-action" data-cycle-experiment="${item.id}">${experimentAdvanceLabel(item)}</button></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Health FindingやContext Signalから追加できます。</div>'}</section>
   <button class="btn quiet full" id="manualExperiment">手動で実験を追加</button>
   <div class="section-head compact-head"><h2>Recent Results</h2><span class="muted">最大10件</span></div>
   <section class="history-list">${insight.recent.length?insight.recent.map(entry=>`<div class="history-row"><span class="history-symbol">${entry.mode==='party'?'P':'S'}</span><span><b>${entry.winners.length?`勝者 ${entry.winners.map(esc).join(' & ')}`:'勝者なし'}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${entry.players.length}人</small></span><time>${formatPlayedAt(entry.at)}</time></div>`).join(''):'<div class="catalog-empty">最近の結果はありません。</div>'}</section>`;
@@ -252,7 +291,7 @@ function renderGameInsights(id){
     const result=improvementQueue.add({gameId:id,title:issue.action||issue.title,source:{kind:'health',key,detail:issue.detail||issue.title,action:issue.action}});
     toast(result.created?'改善実験を追加しました':'同じ実験は追加済みです');renderGameInsights(id);
   });
-  app.querySelectorAll('[data-cycle-experiment]').forEach(button=>button.onclick=()=>{improvementQueue.cycle(button.dataset.cycleExperiment);renderGameInsights(id)});
+  app.querySelectorAll('[data-cycle-experiment]').forEach(button=>button.onclick=()=>{advanceExperiment(button.dataset.cycleExperiment);renderGameInsights(id)});
   app.querySelector('#manualExperiment').onclick=()=>{
     const title=prompt('試したい改善案');if(!title?.trim())return;
     const note=prompt('検証メモ（任意）','')||'';
@@ -587,11 +626,11 @@ function renderImprovementQueue(){
   updateBadge('IMPROVEMENT QUEUE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="queueBack">←</button><div><div class="eyebrow">IMPROVEMENT QUEUE</div><div class="screen-title">改善実験</div></div></div>
   <section class="health-summary improvement-summary"><div><b>${summary.testing}</b><span>TESTING</span></div><div><b>${summary.planned}</b><span>PLANNED</span></div><div><b>${summary.done}</b><span>DONE</span></div><div><b>${summary.games}</b><span>games</span></div></section>
-  <div class="lab-note">状態ボタンを押すと PLANNED → TESTING → DONE → PLANNED の順に進みます。各ゲーム最大5件で、上限時は完了済みまたは最古の項目から入れ替わります。</div>
-  <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p></div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentStatusLabel(item.status)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
+  <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。DONE時点の結果を固定保存します。</div>
+  <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId),result=experimentEvaluation(item);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p>${result?`<section class="experiment-result ${experimentOutcomeClass(result)}"><div class="experiment-result-head"><b>${experimentOutcomeLabel(result.outcome)}</b><span>${esc(result.cohort?.label||'All reviews')}</span></div><div class="experiment-result-counts"><span>Before ${result.baselineCount}</span><span>After ${result.afterCount}</span><span>必要 After 3</span></div><div class="experiment-axis-deltas">${result.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${Number.isFinite(axis.delta)?`${axis.delta>0?'+':''}${axis.delta.toFixed(1)}`:'—'}</b></span>`).join('')}</div></section>`:''}</div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentAdvanceLabel(item)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
   app.querySelector('#queueBack').onclick=renderHome;
   app.querySelectorAll('[data-queue-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.queueGame));
-  app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{improvementQueue.cycle(button.dataset.queueCycle);renderImprovementQueue()});
+  app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{advanceExperiment(button.dataset.queueCycle);renderImprovementQueue()});
   app.querySelectorAll('[data-queue-note]').forEach(button=>button.onclick=()=>{
     const item=rows.find(row=>row.id===button.dataset.queueNote);if(!item)return;
     const note=prompt('検証メモ',item.note||item.source.action||'');if(note==null)return;
