@@ -140,3 +140,26 @@ test('outcome labels are stable',()=>{
   assert.equal(experimentOutcomeLabel('flat'),'FLAT');
   assert.equal(experimentOutcomeLabel('collecting'),'COLLECTING');
 });
+
+test('exact plus and minus half quality deltas hit improved and worse boundaries',()=>{
+  const baseline={
+    startedAt:10,
+    cohort:{mode:null,difficulty:null,label:'All reviews'},
+    count:2,
+    axes:{fun:3,clarity:3,brain:3,replay:3},
+    quality:3
+  };
+  const experiment={source:{kind:'manual'},testingStartedAt:10,baseline};
+  const improved=[
+    event(11,scores(3.5,3.5,3,3.5)),
+    event(12,scores(3.5,3.5,3,3.5)),
+    event(13,scores(3.5,3.5,3,3.5))
+  ];
+  const worse=[
+    event(11,scores(2.5,2.5,3,2.5)),
+    event(12,scores(2.5,2.5,3,2.5)),
+    event(13,scores(2.5,2.5,3,2.5))
+  ];
+  assert.equal(evaluateExperiment(experiment,improved).outcome,'improved');
+  assert.equal(evaluateExperiment(experiment,worse).outcome,'worse');
+});
