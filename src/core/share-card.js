@@ -91,23 +91,26 @@ export function renderPartyShareSvg(model){
   const ranking=model.ranking||[],rounds=model.rounds||[];
   let body=header('PARTY RECAP',short(model.title,30),model.subtitle||'');
   body+=text(84,322,'FINAL STANDINGS',21,760,MUTED);
-  ranking.slice(0,8).forEach((row,i)=>{
-    const y=382+i*62;
-    body+=text(90,y,`${row.rank}. ${short(row.name,18)}`,30,row.rank===1?780:620,INK);
-    body+=text(970,y,`${row.score} pt`,30,760,INK,'end');
-    if(i<Math.min(ranking.length,8)-1)body+=`<line x1="90" y1="${y+21}" x2="970" y2="${y+21}" stroke="${LINE}" stroke-width="1"/>`;
+  const visibleRanking=ranking.slice(0,8);
+  visibleRanking.forEach((row,i)=>{
+    const y=382+i*54;
+    body+=text(90,y,`${row.rank}. ${short(row.name,18)}`,28,row.rank===1?780:620,INK);
+    body+=text(970,y,`${row.score} pt`,28,760,INK,'end');
+    if(i<visibleRanking.length-1)body+=`<line x1="90" y1="${y+18}" x2="970" y2="${y+18}" stroke="${LINE}" stroke-width="1"/>`;
   });
-  const offset=382+Math.min(ranking.length,8)*62+38;
+  const offset=382+visibleRanking.length*54+26;
   body+=text(84,offset,'MVP',21,760,MUTED);
-  body+=text(84,offset+50,model.mvp?.length?short(model.mvp.join(' & '),34):'—',36,760,INK);
-  const roundY=offset+116;
+  body+=text(84,offset+46,model.mvp?.length?short(model.mvp.join(' & '),34):'—',33,760,INK);
+  const roundY=offset+104;
   body+=text(84,roundY,'ROUNDS',21,760,MUTED);
-  rounds.slice(0,6).forEach((round,i)=>{
-    const y=roundY+52+i*68;
-    body+=text(90,y,String(round.index).padStart(2,'0'),22,760,SAGE);
-    body+=text(150,y,short(round.game,23),27,680,INK);
-    body+=text(970,y,round.winners?.length?short(round.winners.join(' & '),16):'—',23,600,MUTED,'end');
+  const maxRounds=Math.max(1,Math.min(6,Math.floor((1216-(roundY+42))/54)));
+  rounds.slice(0,maxRounds).forEach((round,i)=>{
+    const y=roundY+46+i*54;
+    body+=text(90,y,String(round.index).padStart(2,'0'),20,760,SAGE);
+    body+=text(150,y,short(round.game,23),24,680,INK);
+    body+=text(970,y,round.winners?.length?short(round.winners.join(' & '),16):'—',21,600,MUTED,'end');
   });
+  if(rounds.length>maxRounds)body+=text(150,roundY+46+maxRounds*54,`+${rounds.length-maxRounds} rounds`,20,650,MUTED);
   return shell(body);
 }
 
@@ -165,11 +168,14 @@ export async function svgToPngBlob(svg,{width=WIDTH,height=HEIGHT}={}){
 }
 
 export async function shareSvgCard(svg,{filename='party-pocket.png',title='Party Pocket'}={}){
-  const blob=await svgToPngBlob(svg),file=new File([blob],filename,{type:'image/png'});
+  const blob=await svgToPngBlob(svg);
   try{
-    if(navigator.share&&navigator.canShare?.({files:[file]})){
-      await navigator.share({files:[file],title});
-      return'shared';
+    if(typeof File!=='undefined'){
+      const file=new File([blob],filename,{type:'image/png'});
+      if(navigator.share&&navigator.canShare?.({files:[file]})){
+        await navigator.share({files:[file],title});
+        return'shared';
+      }
     }
   }catch(error){
     if(error?.name==='AbortError')return'cancelled';
