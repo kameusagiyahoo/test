@@ -19,6 +19,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 気に入ったParty構成をゲーム順ごと最大8件保存して再利用
 - 完了PartyをRecap付きで最大50件保存し、ラウンドごとの勝者と得点推移を確認
 - Stats + Party HistoryからPlayer Profile / Recordsを自動集計
+- Achievements / Milestonesを履歴から自動判定し、進捗付きで表示
 
 ## Games
 
@@ -127,6 +128,17 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Local StatsのPlayers行からプロフィールを開ける
 - Recordsとして最多勝 / 最高勝率 / Party最多勝 / MVP最多を表示
 - 最高勝率Recordは最低5試合から表示
+
+## Achievements / Milestones
+- 新しい保存データは作らずPlayer Profileから毎回再計算
+- 14種類の実績を用意
+- 通算勝利 / 試合数 / Party優勝 / Party完走 / MVP / 累積Party pt / 遊んだゲーム数 / 複数ゲーム勝利 / 同じ相手との対戦数などで判定
+- Homeに端末全体の解除数とAchievement画面への入口を表示
+- Achievement Boardでプレイヤーごとの解除数を比較
+- Player Profileに解除済みBadgeを表示
+- 未解除の中から達成率が高いNext Milestonesを3件表示
+- Progress barで現在値 / 目標値を表示
+- 勝率そのものをAchievement条件には使わず、少数試合の偶然を実績化しない
 
 ## Modes
 
@@ -255,6 +267,7 @@ src/
 │  ├ party-presets.js
 │  ├ party-history.js
 │  ├ player-profile.js
+│  ├ achievements.js
 │  └ transport.js
 └ games/
    ├ sync.js
