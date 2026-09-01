@@ -1,6 +1,6 @@
 {
   "name": "party-pocket",
-  "version": "8.30.0",
+  "version": "8.30.1",
   "private": true,
   "type": "module",
   "scripts": {
