@@ -24,6 +24,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Season Boardで月ごとの勝利数・Party優勝・MVP・前月差を表示
 - Game Insightsでゲーム単位の実績・Playtest・Health根拠を統合表示
 - Playtest Timelineで新規4軸評価を日時・モード・人数付きイベントとして保存
+- Solo 3ゲームにEasy / Normal / Hardを追加し、難易度別自己ベストとDaily難易度を管理
 
 ## Games
 
@@ -188,6 +189,13 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 ## Modes
 
 ### Solo Challenge
+- Memory / Number Route / Pattern CodeでEasy / Normal / Hardを選択可能
+- Memory: Easy 5桁・3.2秒 / Normal 6〜7桁・2.5秒 / Hard 8〜9桁・1.8秒
+- Number Route: Easy 3マス・1〜6 / Normal 4マス・1〜8 / Hard 5マス・1〜9
+- Pattern Code: Easy 基本加減算 / Normal 交互・差分 / Hard 等比・複合規則
+- 難易度ごとに最短クリアラウンド / 最長連続成功 / 完走回数を分離保存
+- 既存v8.25以前のSolo実績はNormalへ自動移行
+- Daily Challengeはゲーム + 難易度を日替わりで指定し、Hardのみ5ラウンド以内、Easy/Normalは4ラウンド以内
 - 1人 + Solo対応ゲームでは、5点到達までのラウンド数を記録
 - ゲーム別に最短クリアラウンド / 最長連続成功 / 完走回数をlocalStorageへ保存
 - 毎日1つのSoloゲームをDaily Challengeとして提示
