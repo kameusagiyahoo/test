@@ -18,6 +18,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Smart Party Builderが人数・履歴・評価から3/6/9ラウンドを自動構成
 - 気に入ったParty構成をゲーム順ごと最大8件保存して再利用
 - 完了PartyをRecap付きで最大50件保存し、ラウンドごとの勝者と得点推移を確認
+- Stats + Party HistoryからPlayer Profile / Recordsを自動集計
 
 ## Games
 
@@ -115,6 +116,17 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Party History一覧 → 詳細Recapを表示
 - 過去履歴から同じ構成で再戦 / Saved Partyへ保存可能
 - Data Vaultバックアップへ進行中・完了履歴とも自動的に含まれる
+
+## Player Profiles / Records
+- 新しい保存データは作らず、Local Stats + Party Historyから都度算出
+- プレイヤー別に総試合数 / 勝利数 / 勝率 / 遊んだゲーム数を表示
+- Party完走数 / Party勝利数 / MVP回数 / 累積Party ptを表示
+- 得意ゲームTop3は勝数 → 勝率 → 試合数で並べ、2試合以上の実績を優先
+- 対戦相手別に完了Partyの最終スコアを比較し、勝-分-敗を集計
+- 直近5Partyのフォームを勝 / 分 / 敗で表示し、タップでRecapへ移動
+- Local StatsのPlayers行からプロフィールを開ける
+- Recordsとして最多勝 / 最高勝率 / Party最多勝 / MVP最多を表示
+- 最高勝率Recordは最低5試合から表示
 
 ## Modes
 
@@ -242,6 +254,7 @@ src/
 │  ├ recommender.js
 │  ├ party-presets.js
 │  ├ party-history.js
+│  ├ player-profile.js
 │  └ transport.js
 └ games/
    ├ sync.js
