@@ -16,6 +16,7 @@ import {buildPlayerProfile,buildPlayerProfiles,topPlayerRecords} from './core/pl
 import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,unlockedAchievements} from './core/achievements.js';
 import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
 import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from './core/season.js';
+import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insights.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -55,7 +56,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.23.0';
+const APP_VERSION='8.24.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -167,15 +168,52 @@ function bindGameLaunch(container=app){
   container.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>{saveDraft({quiet:true});renderGameDetail(button.dataset.game)});
 }
 
+function gameInsightData(id){
+  const ids=listGames().map(g=>g.id),playtest=playtests.get(id),report=stats.report(ids);
+  const statRow=report.gameStats.find(row=>row.gameId===id);
+  const health=buildHealthReport([id],[{gameId:id,...playtest}],statRow?[statRow]:[]).games[0];
+  return buildGameInsights(id,stats.history(),playtest,health);
+}
+
+function insightAxisLabel(id){
+  return id==='fun'?'面白さ':id==='clarity'?'分かりやすさ':id==='brain'?'頭を使う度':'もう一度遊びたい';
+}
+
+function renderGameInsights(id){
+  disposeActiveGame();
+  const game=getGame(id);if(!game)return renderHome();
+  const insight=gameInsightData(id),status=insight.health?.status||'data';
+  updateBadge('GAME INSIGHTS');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
+  <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
+  <section class="lab-summary insight-summary"><div><b>${insight.plays}</b><span>total plays</span></div><div><b>${insight.single}</b><span>Single</span></div><div><b>${insight.party}</b><span>Party</span></div><div><b>${trendLabel(insight)}</b><span>30日差</span></div></section>
+  <div class="section-head compact-head"><h2>Mode Split</h2><span class="muted">完了試合のみ</span></div>
+  <section class="mode-split"><div><span>Single</span><b>${Math.round(insight.singleShare*100)}%</b><i><em style="width:${Math.round(insight.singleShare*100)}%"></em></i></div><div><span>Party</span><b>${Math.round(insight.partyShare*100)}%</b><i><em style="width:${Math.round(insight.partyShare*100)}%"></em></i></div></section>
+  <div class="section-head compact-head"><h2>Player Count</h2><span class="muted">何人で遊ばれたか</span></div>
+  <section class="insight-buckets">${insight.playerCountBuckets.length?insight.playerCountBuckets.map(row=>`<div><b>${row.playerCount}人</b><span>${row.plays}回 · ${Math.round(row.share*100)}%</span></div>`).join(''):'<div class="catalog-empty">人数データがありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Playtest</h2><span class="muted">新4軸評価 ${insight.reviews}件</span></div>
+  <section class="insight-axes">${insight.axes.map(axis=>`<div><span>${insightAxisLabel(axis.id)}</span><b>${oneDecimal(axis.average)}</b><i><em style="width:${Number.isFinite(axis.average)?Math.round(axis.average/5*100):0}%"></em></i><small>${axis.count} responses</small></div>`).join('')}</section>
+  <div class="lab-note">Playtestは現在の累積平均です。評価イベントの日時履歴はまだ保存していないため、評価の時系列トレンドは推測しません。</div>
+  <div class="section-head compact-head"><h2>Player Results</h2><span class="muted">勝数 / 勝率</span></div>
+  <section class="insight-player-list">${insight.players.length?insight.players.map((row,index)=>`<button class="insight-player-row" data-insight-player="${encodeURIComponent(row.name)}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span><b>${esc(row.name)}</b><small>${row.plays}試合</small></span><span class="stats-value"><b>${row.wins}勝</b><small>${percent(row.winRate)}</small></span></button>`).join(''):'<div class="catalog-empty">プレイヤーデータがありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Health Findings</h2><span class="health-status ${status}">${healthStatusLabel(status)}</span></div>
+  <section class="insight-findings">${insight.health?.issues?.length?insight.health.issues.map(item=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p></div>`).join(''):'<div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div>'}</section>
+  <div class="section-head compact-head"><h2>Recent Results</h2><span class="muted">最大10件</span></div>
+  <section class="history-list">${insight.recent.length?insight.recent.map(entry=>`<div class="history-row"><span class="history-symbol">${entry.mode==='party'?'P':'S'}</span><span><b>${entry.winners.length?`勝者 ${entry.winners.map(esc).join(' & ')}`:'勝者なし'}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${entry.players.length}人</small></span><time>${formatPlayedAt(entry.at)}</time></div>`).join(''):'<div class="catalog-empty">最近の結果はありません。</div>'}</section>`;
+  app.querySelector('#insightBack').onclick=()=>renderGameDetail(id);
+  app.querySelectorAll('[data-insight-player]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.insightPlayer)));
+}
+
 function renderGameDetail(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const meta=gameMeta(id),guide=gameGuide(id),favorite=library.isFavorite(id);
+  const meta=gameMeta(id),guide=gameGuide(id),favorite=library.isFavorite(id),insight=gameInsightData(id);
   updateBadge('GAME GUIDE');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="detailBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME GUIDE</div><div class="screen-title">${game.title}</div></div></div></div>
-  <section class="panel game-detail"><div class="detail-facts"><span>${difficultyLabel(meta.difficulty)}</span><span>約${meta.minutes}分</span><span>${playerRangeLabel(meta)}推奨</span></div><div class="detail-section"><div class="eyebrow">OBJECTIVE</div><h3>${esc(guide.objective)}</h3></div><div class="detail-section"><div class="eyebrow">HOW TO PLAY</div><ol class="rule-steps">${guide.rules.map(rule=>`<li>${esc(rule)}</li>`).join('')}</ol></div><div class="detail-grid"><div class="detail-note"><div class="eyebrow">WIN / SCORE</div><p>${esc(guide.scoring)}</p></div><div class="detail-note"><div class="eyebrow">EXAMPLE</div><p>${esc(guide.example)}</p></div></div><div class="detail-actions"><button class="btn quiet favorite-button ${favorite?'active':''}" id="favoriteToggle">${favorite?'★ お気に入り済み':'☆ お気に入り'}</button><button class="btn primary" id="detailStart">このゲームを始める</button></div></section>`;
+  <section class="panel game-detail"><div class="detail-facts"><span>${difficultyLabel(meta.difficulty)}</span><span>約${meta.minutes}分</span><span>${playerRangeLabel(meta)}推奨</span></div><button class="game-insight-preview ${insight.health.status}" id="detailInsights"><span><span class="eyebrow">GAME INSIGHTS</span><b>${insight.plays} plays · ${healthStatusLabel(insight.health.status)}</b><small>${gameInsightHeadline(insight)} · 30日差 ${trendLabel(insight)}</small></span><span class="recommend-arrow">→</span></button><div class="detail-section"><div class="eyebrow">OBJECTIVE</div><h3>${esc(guide.objective)}</h3></div><div class="detail-section"><div class="eyebrow">HOW TO PLAY</div><ol class="rule-steps">${guide.rules.map(rule=>`<li>${esc(rule)}</li>`).join('')}</ol></div><div class="detail-grid"><div class="detail-note"><div class="eyebrow">WIN / SCORE</div><p>${esc(guide.scoring)}</p></div><div class="detail-note"><div class="eyebrow">EXAMPLE</div><p>${esc(guide.example)}</p></div></div><div class="detail-actions"><button class="btn quiet favorite-button ${favorite?'active':''}" id="favoriteToggle">${favorite?'★ お気に入り済み':'☆ お気に入り'}</button><button class="btn primary" id="detailStart">このゲームを始める</button></div></section>`;
   app.querySelector('#detailBack').onclick=renderHome;
   app.querySelector('#favoriteToggle').onclick=()=>{library.toggleFavorite(id);renderGameDetail(id)};
+  app.querySelector('#detailInsights').onclick=()=>renderGameInsights(id);
   app.querySelector('#detailStart').onclick=()=>{session.startSingle();startGame(id)};
 }
 
