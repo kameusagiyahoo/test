@@ -20,6 +20,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 完了PartyをRecap付きで最大50件保存し、ラウンドごとの勝者と得点推移を確認
 - Stats + Party HistoryからPlayer Profile / Recordsを自動集計
 - Achievements / Milestonesを履歴から自動判定し、進捗付きで表示
+- Party RecapとPlayer Profileを端末内生成PNGとして共有可能
 
 ## Games
 
@@ -139,6 +140,15 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 未解除の中から達成率が高いNext Milestonesを3件表示
 - Progress barで現在値 / 目標値を表示
 - 勝率そのものをAchievement条件には使わず、少数試合の偶然を実績化しない
+
+## Share Cards
+- Party終了画面からParty結果をPNGで共有
+- Party History詳細から過去結果もPNG共有
+- Player Profileを戦績 / Best Games / Achievements付きPNGとして共有
+- 外部サービスやサーバーは使わず、端末内でSVG → Canvas → PNG生成
+- iPhoneではWeb Share API対応時に共有シートへ渡す
+- 共有非対応環境ではPNG保存へフォールバック
+- 8人Partyでも画像下端を超えないよう、ラウンド表示件数を自動調整
 
 ## Modes
 
@@ -268,6 +278,7 @@ src/
 │  ├ party-history.js
 │  ├ player-profile.js
 │  ├ achievements.js
+│  ├ share-card.js
 │  └ transport.js
 └ games/
    ├ sync.js
