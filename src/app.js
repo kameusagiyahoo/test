@@ -15,6 +15,7 @@ import {PartyHistoryStore,partyLeadChanges,partyMvp} from './core/party-history.
 import {buildPlayerProfile,buildPlayerProfiles,topPlayerRecords} from './core/player-profile.js';
 import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,unlockedAchievements} from './core/achievements.js';
 import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
+import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from './core/season.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -54,7 +55,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.22.0';
+const APP_VERSION='8.23.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -200,8 +201,10 @@ function renderHome(){
   const groups=playerGroups.recent();
   const partyPresets=savedParties.recent(validIds);
   const recentParties=partyHistory.history(validIds).slice(0,3);
-  const profileRows=buildPlayerProfiles(stats.history().filter(e=>validIds.includes(e.gameId)),partyHistory.history(validIds));
+  const statEntries=stats.history().filter(e=>validIds.includes(e.gameId)),partyEntries=partyHistory.history(validIds);
+  const profileRows=buildPlayerProfiles(statEntries,partyEntries);
   const achievementData=achievementSummary(profileRows);
+  const currentSeason=buildSeasonView(currentSeasonKey(),statEntries,partyEntries);
   const daily=soloProgress.daily(),dailyGame=byId.get(daily.gameId),soloSummary=soloProgress.summary();
   updateBadge(`${session.players.length}人 · ${games.length} games · ${pwaStatusLabel()}`);
   const resumeHtml=saved&&savedGame?`<section class="resume-card"><div><div class="eyebrow">SAVED PARTY</div><h3>Round ${saved.round+1}/${saved.totalRounds} から再開</h3><p>${esc(savedGame.title)}から続けます。ラウンド途中で閉じた場合、そのラウンドは最初から始まります。</p></div><div class="resume-actions"><button class="btn primary" id="resumeParty">再開する</button><button class="btn quiet" id="discardParty">保存を破棄</button></div></section>`:'';
@@ -221,6 +224,7 @@ function renderHome(){
   ${session.players.length===1&&dailyGame?`<section class="solo-daily ${daily.cleared?'cleared':''}"><div><div class="eyebrow">DAILY SOLO</div><h3>${dailyGame.emoji} ${dailyGame.title}</h3><p>${daily.maxRounds}ラウンド以内に5点到達でクリア。</p><div class="solo-daily-meta"><span>${daily.cleared?'今日クリア済み':'今日の挑戦'}</span><span>連続 ${daily.streak}日</span><span>Solo完走 ${soloSummary.totalClears}回</span></div></div><button class="btn primary" id="dailySolo">${daily.cleared?'もう一度':'挑戦する'}</button></section><div class="section-head"><h2>Solo Progress</h2><span class="muted">自己ベスト</span></div><section class="solo-progress-list">${SOLO_GAME_IDS.map(id=>{const g=byId.get(id),p=soloProgress.game(id);return`<button class="solo-progress-row" data-game="${id}"><span class="recommend-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||id)}</b><small>最短 ${p?.bestRounds??'—'}ラウンド · 連続成功 ${p?.bestStreak||0} · 完走 ${p?.clears||0}回</small></span><span class="recommend-arrow">→</span></button>`}).join('')}</section>`:''}
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>24ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
+  <section class="playtest-entry season-entry"><div><div class="eyebrow">SEASON BOARD · ${esc(currentSeason.label)}</div><h3>${currentSeason.rows.length?`${esc(currentSeason.rows[0].name)}が${currentSeason.rows[0].wins}勝で首位`:'今月のランキングを始める'}</h3><p>${currentSeason.totalPlays}試合 · ${currentSeason.partySessions} Party · ${currentSeason.players} players。前月との差も自動比較します。</p></div><button class="btn quiet" id="seasonBoard">月間順位</button></section>
   <section class="playtest-entry achievement-entry"><div><div class="eyebrow">ACHIEVEMENTS</div><h3>${achievementData.unlocked} badges unlocked</h3><p>${achievementData.players?`${achievementData.players}人の実績を履歴から自動判定。${achievementData.leader?` 現在トップは${esc(achievementData.leader.name)}の${achievementData.leader.unlocked}個。`:''}`:'プレイすると実績と次のMilestoneが自動で増えていきます。'}</p></div><button class="btn quiet" id="achievements">実績を見る</button></section>
   <section class="playtest-entry health-entry"><div><div class="eyebrow">GAME HEALTH</div><h3>改善すべきゲームを自動検出</h3><p>プレイ回数・勝率・4軸評価を統合し、問題の種類と次の改善アクションを出します。</p></div><button class="btn quiet" id="gameHealth">分析を見る</button></section>
   <section class="playtest-entry data-entry"><div><div class="eyebrow">DATA VAULT</div><h3>端末データをバックアップ</h3><p>プレイヤー・履歴・評価・お気に入り・Solo進捗をJSONへ保存し、別端末でも復元できます。</p></div><button class="btn quiet" id="dataVault">管理する</button></section>
@@ -273,6 +277,7 @@ function renderHome(){
   if(app.querySelector('.solo-progress-list'))bindGameLaunch(app.querySelector('.solo-progress-list'));
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
+  app.querySelector('#seasonBoard').onclick=()=>renderSeasonBoard(currentSeasonKey());
   app.querySelector('#achievements').onclick=renderAchievements;
   app.querySelector('#gameHealth').onclick=renderGameHealth;
   app.querySelector('#dataVault').onclick=renderDataVault;
@@ -354,6 +359,31 @@ function percent(value){return `${Math.round((Number(value)||0)*100)}%`}
 function formatPlayedAt(at){
   try{return new Date(at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
   catch{return''}
+}
+
+function seasonDelta(value){
+  const n=Number(value)||0;
+  return n>0?'+'+n:String(n);
+}
+
+function renderSeasonBoard(selectedKey=currentSeasonKey()){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id);
+  const statEntries=stats.history().filter(entry=>ids.includes(entry.gameId));
+  const partyEntries=partyHistory.history(ids);
+  const keys=availableSeasonKeys(statEntries,partyEntries);
+  if(!keys.includes(selectedKey))keys.unshift(selectedKey);
+  const view=buildSeasonView(selectedKey,statEntries,partyEntries);
+  updateBadge('SEASON BOARD');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="seasonBack">←</button><div><div class="eyebrow">SEASON BOARD</div><div class="screen-title">${esc(view.label)}</div></div></div>
+  <section class="season-tabs">${keys.slice(0,12).map(key=>`<button class="season-tab ${key===selectedKey?'active':''}" data-season-key="${key}">${esc(seasonLabel(key))}</button>`).join('')}</section>
+  <section class="lab-summary season-summary"><div><b>${view.totalPlays}</b><span>記録試合</span></div><div><b>${view.partySessions}</b><span>Party</span></div><div><b>${view.players}</b><span>players</span></div><div><b>${view.gamesPlayed}</b><span>titles</span></div></section>
+  <div class="lab-note">順位は「勝利数 → Party総合優勝 → MVP → 勝率 → 試合数」。前月差は同じプレイヤーの前月実績との差です。</div>
+  <section class="season-standings">${view.rows.length?view.rows.map(row=>`<button class="season-row" data-season-player="${encodeURIComponent(row.name)}"><span class="season-rank">${String(row.rank).padStart(2,'0')}</span><span class="season-player"><b>${esc(row.name)}</b><small>${row.plays}試合 · 勝率 ${percent(row.winRate)} · ${row.gamesPlayed} titles</small></span><span class="season-main"><b>${row.wins}勝</b><small>前月比 ${seasonDelta(row.deltaWins)}</small></span><span class="season-extra"><b>Party ${row.partyWins}</b><small>MVP ${row.mvpCount} · ${row.partyPoints} pt</small></span></button>`).join(''):'<div class="catalog-empty">この月の完了試合はまだありません。</div>'}</section>
+  ${view.rows.length>=2?`<section class="season-podium"><div class="eyebrow">TOP 3</div><div class="season-podium-grid">${view.rows.slice(0,3).map(row=>`<div><span>${row.rank}</span><b>${esc(row.name)}</b><small>${row.wins}勝 · Party ${row.partyWins}勝 · MVP ${row.mvpCount}</small></div>`).join('')}</div></section>`:''}`;
+  app.querySelector('#seasonBack').onclick=renderHome;
+  app.querySelectorAll('[data-season-key]').forEach(button=>button.onclick=()=>renderSeasonBoard(button.dataset.seasonKey));
+  app.querySelectorAll('[data-season-player]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.seasonPlayer)));
 }
 
 function renderStatsDashboard(){
