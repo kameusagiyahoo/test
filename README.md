@@ -211,6 +211,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 
 ## Game Improvement Queue / Experiments
 - Game InsightsのHealth Finding / Context Signalから1タップで改善実験を追加
+- TESTING開始時にBefore baselineを固定し、その後のPlaytestでBefore / Afterを自動評価
 - 手動の改善案も追加可能
 - 状態は PLANNED → TESTING → DONE の3段階
 - 各ゲーム最大5件。上限時はDONEまたは最古の項目から入れ替え
@@ -219,6 +220,21 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - HomeにImprovement Queue入口とplanned/testing件数を表示
 - 全ゲーム横断のQueue画面から状態変更 / メモ編集 / 削除 / Game Insightsへの移動が可能
 - Data Vaultバックアップ対象
+
+## Experiment Results / Before-After Evaluation
+- PLANNED → TESTINGへ切り替えた瞬間にBaselineを固定保存
+- Baselineは開始前の直近Playtest Eventを最大10件利用
+- Context Signal由来の実験は、評価が低かったmode / Solo difficultyだけを追跡
+- Health / Manual実験はゲーム全体のレビューを追跡
+- Testing開始後の新規レビューをAfterとして集計
+- Baseline 2件 + After 3件以上で自動判定
+- Qualityは Fun / Clarity / Replay の平均で判定し、Brain Loadは品質判定に含めず差分のみ表示
+- Quality差 +0.5以上 = IMPROVED、-0.5以下 = WORSE、それ以外 = FLAT
+- 件数不足時はCOLLECTINGとして明示し、推測判定しない
+- DONEへ移した瞬間の結果をfinalResultとして固定保存し、その後のレビューで結果が変わらない
+- DONE → PLANNEDへ戻すとBaseline / finalResultをリセットして再実験可能
+- Improvement QueueとGame Insightsの両方でBefore件数 / After件数 / 4軸差を表示
+- 新しいlocalStorageキーは増やさず、既存Improvement Queue V1の任意フィールドとして保存
 
 ## Modes
 
@@ -361,6 +377,7 @@ src/
 │  ├ playtest-events.js
 │  ├ solo-analytics.js
 │  ├ improvement-queue.js
+│  ├ experiment-evaluation.js
 │  └ transport.js
 └ games/
    ├ sync.js
