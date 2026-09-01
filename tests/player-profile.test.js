@@ -87,7 +87,7 @@ test('buildPlayerProfiles includes names seen only in party history',()=>{
 test('records require five games before best win-rate is shown',()=>{
   const profiles=[
     {name:'A',plays:4,wins:4,winRate:1,partyWins:1,partySessions:1,mvpCount:1},
-    {name:'B',plays:6,wins:4,winRate:4/6,partyWins:2,partySessions:2,mvpCount:0},
+    {name:'B',plays:6,wins:3,winRate:3/6,partyWins:2,partySessions:2,mvpCount:0},
     {name:'C',plays:7,wins:3,winRate:3/7,partyWins:0,partySessions:1,mvpCount:3}
   ];
   const records=topPlayerRecords(profiles);
