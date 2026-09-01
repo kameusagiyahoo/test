@@ -23,6 +23,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Party RecapとPlayer Profileを端末内生成PNGとして共有可能
 - Season Boardで月ごとの勝利数・Party優勝・MVP・前月差を表示
 - Game Insightsでゲーム単位の実績・Playtest・Health根拠を統合表示
+- Playtest Timelineで新規4軸評価を日時・モード・人数付きイベントとして保存
 
 ## Games
 
@@ -174,6 +175,16 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Playtestの個別評価時刻はまだ保存していないため、評価の時系列トレンドは推測しない
 - 新しい保存形式は作らず、既存Stats / Playtest / Healthから都度算出
 
+## Playtest Timeline / Contextual Reviews
+- v8.25以降に記録する4軸評価を個別イベントとして保存
+- イベントには gameId / 4軸スコア / Single・Party / プレイヤー人数 / 日時を保持
+- 最大300イベントをlocalStorageへ保存
+- Game Insightsで直近30日とその前30日の4軸平均を比較
+- Single / Party別の評価件数、人数コンテキスト、直近評価イベントを表示
+- Playtest LabにもTimeline記録件数と30日件数を表示
+- v8.24以前の累積平均はそのまま保持し、存在しない過去イベントは生成しない
+- 新規TimelineイベントはData Vaultバックアップ対象
+
 ## Modes
 
 ### Solo Challenge
@@ -305,6 +316,7 @@ src/
 │  ├ share-card.js
 │  ├ season.js
 │  ├ game-insights.js
+│  ├ playtest-events.js
 │  └ transport.js
 └ games/
    ├ sync.js

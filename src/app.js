@@ -17,6 +17,7 @@ import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,un
 import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
 import {availableSeasonKeys,buildSeasonView,currentSeasonKey,seasonLabel} from './core/season.js';
 import {buildGameInsights,gameInsightHeadline,trendLabel} from './core/game-insights.js';
+import {PlaytestEventStore,buildPlaytestTimeline} from './core/playtest-events.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -39,6 +40,7 @@ const ratings=new RatingStore(globalThis.localStorage);
 const partySettings=new PartySettingsStore(globalThis.localStorage);
 const library=new LibraryStore(globalThis.localStorage);
 const playtests=new PlaytestStore(globalThis.localStorage);
+const playtestEvents=new PlaytestEventStore(globalThis.localStorage);
 const stats=new StatsStore(globalThis.localStorage);
 const soloProgress=new SoloProgressStore(globalThis.localStorage);
 const playerGroups=new PlayerGroupStore(globalThis.localStorage);
@@ -56,7 +58,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.24.0';
+const APP_VERSION='8.25.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -133,7 +135,7 @@ function playtestPromptHtml(gameId){
   const game=getGame(gameId);if(!game)return'';const p=playtests.get(gameId);
   return `<section class="feedback playtest-card" data-playtest-game="${gameId}"><div><div class="eyebrow">PLAYTEST NOTE</div><strong>${esc(game.title)}を4軸で評価</strong><div class="feedback-history">${p.responses?`新評価 ${p.responses}回 · 面白さ ${oneDecimal(p.fun.average)} · 分かりやすさ ${oneDecimal(p.clarity.average)}`:p.legacyResponses?`旧「また遊びたい」評価 ${p.legacyResponses}件を引き継ぎ済み`:'この端末だけに記録します'}</div></div><div class="playtest-fields"><div class="playtest-row"><span>面白さ</span><div class="score-choices">${scoreButtons('fun')}</div></div><div class="playtest-row"><span>分かりやすさ</span><div class="score-choices">${scoreButtons('clarity')}</div></div><div class="playtest-row"><span>頭を使う度</span><div class="score-choices">${scoreButtons('brain')}</div></div><div class="playtest-row"><span>もう一度遊びたい</span><div class="score-choices">${scoreButtons('replay')}</div></div></div><button class="btn primary full playtest-save" disabled>4項目を記録</button></section>`;
 }
-function bindPlaytest(gameId){
+function bindPlaytest(gameId,{mode=session.mode==='party'?'party':'single',playerCount=session.players.length}={}){
   const wrap=app.querySelector(`[data-playtest-game="${gameId}"]`);if(!wrap)return;
   const scores={};const save=wrap.querySelector('.playtest-save');
   wrap.querySelectorAll('[data-axis][data-score]').forEach(button=>button.onclick=()=>{
@@ -144,6 +146,7 @@ function bindPlaytest(gameId){
   save.onclick=()=>{
     if(save.disabled)return;
     const result=playtests.submit(gameId,scores);
+    playtestEvents.record(gameId,scores,{mode,playerCount});
     ratings.rate(gameId,scores.replay>=4?'good':scores.replay===3?'neutral':'bad');
     wrap.innerHTML=`<div><div class="eyebrow">SAVED</div><strong>プレイテスト評価を記録しました</strong><div class="feedback-history">面白さ ${oneDecimal(result.fun.average)} · 分かりやすさ ${oneDecimal(result.clarity.average)} · 頭を使う度 ${oneDecimal(result.brain.average)} · また遊びたい ${oneDecimal(result.replay.average)}</div></div>`;
   };
@@ -182,7 +185,7 @@ function insightAxisLabel(id){
 function renderGameInsights(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const insight=gameInsightData(id),status=insight.health?.status||'data';
+  const insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,playtestEvents.forGame(id)),status=insight.health?.status||'data';
   updateBadge('GAME INSIGHTS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
   <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
@@ -193,7 +196,9 @@ function renderGameInsights(id){
   <section class="insight-buckets">${insight.playerCountBuckets.length?insight.playerCountBuckets.map(row=>`<div><b>${row.playerCount}人</b><span>${row.plays}回 · ${Math.round(row.share*100)}%</span></div>`).join(''):'<div class="catalog-empty">人数データがありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Playtest</h2><span class="muted">新4軸評価 ${insight.reviews}件</span></div>
   <section class="insight-axes">${insight.axes.map(axis=>`<div><span>${insightAxisLabel(axis.id)}</span><b>${oneDecimal(axis.average)}</b><i><em style="width:${Number.isFinite(axis.average)?Math.round(axis.average/5*100):0}%"></em></i><small>${axis.count} responses</small></div>`).join('')}</section>
-  <div class="lab-note">Playtestは現在の累積平均です。評価イベントの日時履歴はまだ保存していないため、評価の時系列トレンドは推測しません。</div>
+  <div class="section-head compact-head"><h2>Review Timeline</h2><span class="muted">v8.25以降の新規評価</span></div>
+  ${timeline.total?`<section class="review-timeline-summary"><div><b>${timeline.total}</b><span>tracked</span></div><div><b>${timeline.currentCount}</b><span>直近30日</span></div><div><b>${timeline.previousCount}</b><span>前30日</span></div><div><b>${timeline.modes.single}/${timeline.modes.party}</b><span>Single / Party</span></div></section><section class="review-trends">${timeline.axes.map(axis=>{const label=insightAxisLabel(axis.id),delta=axis.delta;return`<div><span>${label}</span><b>${Number.isFinite(axis.currentAverage)?axis.currentAverage.toFixed(1):'—'}</b><small>${Number.isFinite(delta)?`${delta>0?'+':''}${delta.toFixed(1)} vs 前30日`:'比較データ待ち'}</small></div>`}).join('')}</section><section class="review-event-list">${timeline.recent.slice(0,6).map(event=>`<div class="review-event-row"><span><b>${event.mode==='party'?'Party':'Single'} · ${event.playerCount}人</b><small>${formatPlayedAt(event.at)}</small></span><span class="review-event-scores">F ${event.scores.fun} · C ${event.scores.clarity} · B ${event.scores.brain} · R ${event.scores.replay}</span></div>`).join('')}</section>`:'<div class="catalog-empty">次に記録する4軸評価からTimelineを開始します。</div>'}
+  <div class="lab-note">既存の累積Playtest平均はそのまま利用します。v8.25以前の個別評価日時は存在しないため、過去イベントを推測生成せず、Timelineは新規評価だけで比較します。</div>
   <div class="section-head compact-head"><h2>Player Results</h2><span class="muted">勝数 / 勝率</span></div>
   <section class="insight-player-list">${insight.players.length?insight.players.map((row,index)=>`<button class="insight-player-row" data-insight-player="${encodeURIComponent(row.name)}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span><b>${esc(row.name)}</b><small>${row.plays}試合</small></span><span class="stats-value"><b>${row.wins}勝</b><small>${percent(row.winRate)}</small></span></button>`).join(''):'<div class="catalog-empty">プレイヤーデータがありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Health Findings</h2><span class="health-status ${status}">${healthStatusLabel(status)}</span></div>
@@ -379,7 +384,7 @@ function weakestAxis(row){
 function renderPlaytestLab(){
   disposeActiveGame();
   const games=listGames(),byId=new Map(games.map(g=>[g.id,g]));
-  const report=playtests.report(games.map(g=>g.id)).map(row=>({...row,game:byId.get(row.gameId)}));
+  const report=playtests.report(games.map(g=>g.id)).map(row=>({...row,game:byId.get(row.gameId),timeline:buildPlaytestTimeline(row.gameId,playtestEvents.forGame(row.gameId))}));
   const evaluated=report.filter(r=>r.responses>0).length;
   const stable=report.filter(r=>r.responses>=2);
   const weak=stable.filter(r=>r.qualityAverage<3.3).length;
@@ -388,7 +393,7 @@ function renderPlaytestLab(){
     return ag-bg||(a.qualityAverage??99)-(b.qualityAverage??99)||b.responses-a.responses;
   });
   updateBadge('PLAYTEST LAB');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="labBack">←</button><div><div class="eyebrow">PLAYTEST LAB</div><div class="screen-title">ゲーム品質を確認</div></div></div><section class="lab-summary"><div><b>${evaluated}</b><span>/ ${games.length} 評価済み</span></div><div><b>${stable.length}</b><span>2回以上</span></div><div><b>${weak}</b><span>改善優先</span></div></section><div class="lab-note">改善優先度は「面白さ・分かりやすさ・もう一度遊びたい」の平均で判定。頭を使う度はゲーム特性として別表示します。</div><section class="lab-list">${ordered.map(row=>{const s=playtestStatus(row),g=row.game;return`<button class="lab-row" data-game="${row.gameId}"><span class="lab-symbol">${g?.emoji||''}</span><span class="lab-main"><b>${esc(g?.title||row.gameId)}</b><small>${row.responses? `品質 ${oneDecimal(row.qualityAverage)} · 頭脳 ${oneDecimal(row.brain.average)} · ${row.responses}回`:row.legacyResponses?`新4軸評価なし · 旧評価 ${row.legacyResponses}件`:'まだ評価なし'}</small><small>${row.responses? `弱い軸: ${weakestAxis(row)}`:'プレイ後に4軸評価を記録してください'}</small></span><span class="lab-status ${s.tone}">${s.label}</span></button>`}).join('')}</section>`;
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="labBack">←</button><div><div class="eyebrow">PLAYTEST LAB</div><div class="screen-title">ゲーム品質を確認</div></div></div><section class="lab-summary"><div><b>${evaluated}</b><span>/ ${games.length} 評価済み</span></div><div><b>${stable.length}</b><span>2回以上</span></div><div><b>${weak}</b><span>改善優先</span></div></section><div class="lab-note">改善優先度は「面白さ・分かりやすさ・もう一度遊びたい」の平均で判定。頭を使う度はゲーム特性として別表示します。</div><section class="lab-list">${ordered.map(row=>{const s=playtestStatus(row),g=row.game;return`<button class="lab-row" data-game="${row.gameId}"><span class="lab-symbol">${g?.emoji||''}</span><span class="lab-main"><b>${esc(g?.title||row.gameId)}</b><small>${row.responses? `品質 ${oneDecimal(row.qualityAverage)} · 頭脳 ${oneDecimal(row.brain.average)} · ${row.responses}回`:row.legacyResponses?`新4軸評価なし · 旧評価 ${row.legacyResponses}件`:'まだ評価なし'}</small><small>${row.responses? `弱い軸: ${weakestAxis(row)}`:'プレイ後に4軸評価を記録してください'}</small><small>${row.timeline.total?`Timeline ${row.timeline.total}件 · 直近30日 ${row.timeline.currentCount} / 前30日 ${row.timeline.previousCount}`:'Timelineは次回評価から記録'}</small></span><span class="lab-status ${s.tone}">${s.label}</span></button>`}).join('')}</section>`;
   app.querySelector('#labBack').onclick=renderHome;
   bindGameLaunch(app.querySelector('.lab-list'));
 }
@@ -842,7 +847,7 @@ function renderPartyIntermission(first=false,result=null,resuming=false,complete
   const awardHtml=result?`<section class="card result-card"><div class="eyebrow">ROUND RESULT</div><div class="result-list">${session.players.map((name,i)=>`<div class="result-row"><span>${esc(name)}</span><span>+${result.awards[i]} Party pt</span></div>`).join('')}</div></section>`:'';
   const resumeNote=resuming?'<div class="notice">保存地点から再開しました。途中だったラウンドは最初から始まります。</div>':'';
   app.innerHTML=`<section class="panel party-board"><div class="eyebrow">PARTY</div><div class="prompt compact">${first?'構成完了':resuming?'ゲームを再開':'次のラウンド'}</div><div class="party-progress"><span style="width:${progress}%"></span></div>${resumeNote}${awardHtml}${completedGameId?playtestPromptHtml(completedGameId):''}<div class="standings"><div class="setup-label">Standings</div><div class="result-list">${rankingHtml(session.partyScores,'Party pt')}</div></div><div class="next-game"><div class="game-card-top"><span class="game-index">${String(session.party.round+1).padStart(2,'0')} / ${String(session.party.totalRounds).padStart(2,'0')}</span><span class="game-symbol">${game.emoji}</span></div><h3>${game.title}</h3><p>${game.description}</p></div><button class="btn primary full" id="partyNext">${first?'開始する':resuming?'このラウンドを始める':'次へ'}</button></section>`;
-  if(completedGameId)bindPlaytest(completedGameId);app.querySelector('#partyNext').onclick=()=>startGame(nextId);
+  if(completedGameId)bindPlaytest(completedGameId,{mode:'party',playerCount:session.players.length});app.querySelector('#partyNext').onclick=()=>startGame(nextId);
 }
 
 function renderWinner(isParty,ratingGameId=null){
@@ -853,7 +858,7 @@ function renderWinner(isParty,ratingGameId=null){
   const recapHtml=isParty&&lastPartyRecap?partyRecapHtml(lastPartyRecap,{compact:true}):'';
   const savePartyHtml=isParty?`<section class="party-save-card"><div><div class="eyebrow">SAVE THIS PARTY</div><b>この${completedSchedule.length}ラウンド構成を保存</b><small>ゲーム順もそのまま保存します。</small></div><div class="party-save-form"><input id="partyPresetName" maxlength="32" placeholder="例: 定番3本 / 頭脳戦ベスト"><button class="btn quiet" id="savePartyPreset">構成を保存</button></div></section>`:'';
   app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${recapHtml}${isParty&&lastPartyRecap?'<div class="result-share-row"><button class="btn quiet full" id="sharePartyResult">Party結果を画像で共有</button></div>':''}${savePartyHtml}${soloResultHtml}${ratingGameId?playtestPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
-  if(ratingGameId)bindPlaytest(ratingGameId);
+  if(ratingGameId)bindPlaytest(ratingGameId,{mode:isParty?'party':'single',playerCount:session.players.length});
   app.querySelector('#sharePartyResult')?.addEventListener('click',()=>sharePartyCard(lastPartyRecap));
   app.querySelector('#savePartyPreset')?.addEventListener('click',()=>{const name=app.querySelector('#partyPresetName').value.trim();if(!name)return toast('構成名を入力してください');try{savedParties.save(name,completedSchedule);toast(name+'を保存しました');app.querySelector('#savePartyPreset').textContent='保存済み'}catch(error){toast(error?.message||'保存できませんでした')}});
   app.querySelector('#homeResult').onclick=renderHome;
