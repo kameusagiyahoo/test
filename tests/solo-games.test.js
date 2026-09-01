@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {makeMemorySequence,memoryScore} from '../src/games/memory.js';
-import {makeRoutePuzzle,pathSum,routeNeighbors,routeScore} from '../src/games/route.js';
-import {makePatternPuzzle,patternScore} from '../src/games/pattern.js';
+import {makeMemorySequence,memoryChallenge,memoryScore} from '../src/games/memory.js';
+import {makeRoutePuzzle,pathSum,routeDifficultyConfig,routeNeighbors,routeScore} from '../src/games/route.js';
+import {makePatternPuzzle,patternDifficultyBuilders,patternScore} from '../src/games/pattern.js';
 import {categoriesFor,gameMeta,recommendedIds} from '../src/core/catalog.js';
 
 test('memory sequence and scoring support exact and one-error recall',()=>{
@@ -41,5 +41,36 @@ test('solo catalog exposes three one-player games and recommends them for one pl
   for(const id of ['memory','route','pattern']){
     assert.ok(categoriesFor(id).includes('solo'));
     assert.equal(gameMeta(id).minPlayers,1);
+  }
+});
+
+test('memory difficulty changes sequence length and display time',()=>{
+  assert.deepEqual(memoryChallenge('easy',()=>0),{difficulty:'easy',length:5,displayMs:3200});
+  assert.deepEqual(memoryChallenge('normal',()=>0),{difficulty:'normal',length:7,displayMs:2500});
+  assert.deepEqual(memoryChallenge('hard',()=>0),{difficulty:'hard',length:9,displayMs:1800});
+});
+
+test('route difficulty changes path length and number range while keeping guaranteed solutions',()=>{
+  const configs=['easy','normal','hard'].map(routeDifficultyConfig);
+  assert.deepEqual(configs.map(c=>c.pathLength),[3,4,5]);
+  assert.deepEqual(configs.map(c=>c.maxValue),[6,8,9]);
+  let seed=0;const rng=()=>((seed++*37)%100)/100;
+  for(const config of configs){
+    const puzzle=makeRoutePuzzle(rng,config);
+    assert.equal(puzzle.solution.length,config.pathLength);
+    assert.ok(puzzle.values.every(v=>v>=1&&v<=config.maxValue));
+    assert.equal(routeScore(puzzle.values,puzzle.solution,puzzle.target,puzzle.pathLength),2);
+  }
+});
+
+test('pattern difficulty expands the available rule families',()=>{
+  assert.equal(patternDifficultyBuilders('easy').length,2);
+  assert.equal(patternDifficultyBuilders('normal').length,4);
+  assert.equal(patternDifficultyBuilders('hard').length,6);
+  for(const level of ['easy','normal','hard']){
+    const puzzle=makePatternPuzzle(()=>0.99,level);
+    assert.equal(puzzle.difficulty,level);
+    assert.equal(puzzle.choices.length,4);
+    assert.ok(puzzle.choices.includes(puzzle.answer));
   }
 });

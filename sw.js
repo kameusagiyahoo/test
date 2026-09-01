@@ -1,4 +1,4 @@
-const CACHE_NAME='party-pocket-v8.25.0';
+const CACHE_NAME='party-pocket-v8.26.0';
 const APP_SHELL=[
   './',
   './index.html',

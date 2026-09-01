@@ -1,5 +1,14 @@
+import {normalizeSoloDifficulty,soloDifficultyLabel} from '../core/solo.js';
+
 export function makeMemorySequence(rng=Math.random,length=6){
   return Array.from({length},()=>Math.floor(rng()*9)+1);
+}
+
+export function memoryChallenge(difficulty='normal',rng=Math.random){
+  const level=normalizeSoloDifficulty(difficulty);
+  if(level==='easy')return{difficulty:level,length:5,displayMs:3200};
+  if(level==='hard')return{difficulty:level,length:8+(rng()<.35?1:0),displayMs:1800};
+  return{difficulty:level,length:6+(rng()<.35?1:0),displayMs:2500};
 }
 
 export function memoryScore(sequence,answer){
@@ -22,6 +31,10 @@ export const memoryGame={
   }
 };
 
+function currentDifficulty(ctx){
+  return ctx.session.players.length===1?normalizeSoloDifficulty(ctx.soloDifficulty):'normal';
+}
+
 function start(ctx,life){
   if(life.destroyed)return;
   const n=ctx.session.players.length;
@@ -31,20 +44,20 @@ function start(ctx,life){
 function nextPlayer(ctx,state,life){
   if(life.destroyed)return;
   if(state.player>=ctx.session.players.length)return finish(ctx,state,life);
-  const p=state.player,name=ctx.session.players[p],length=6+(Math.random()<.35?1:0);
-  const sequence=makeMemorySequence(Math.random,length);
+  const p=state.player,name=ctx.session.players[p],challenge=memoryChallenge(currentDifficulty(ctx));
+  const sequence=makeMemorySequence(Math.random,challenge.length);
   ctx.renderScorebar(p);
-  ctx.root.innerHTML=`<div class="pass-card"><div class="eyebrow">MEMORY FLASH</div><div class="prompt">${ctx.esc(name)}さんへ</div><div class="sub">準備できたら数字列を表示します。表示は約2.5秒です。</div><button class="btn primary" id="memoryReady">表示する</button></div><div class="rules">数字は左から順番に覚えます。表示後は数字だけを入力してください。</div>`;
+  ctx.root.innerHTML=`<div class="pass-card"><div class="eyebrow">MEMORY FLASH · ${soloDifficultyLabel(challenge.difficulty).toUpperCase()}</div><div class="prompt">${ctx.esc(name)}さんへ</div><div class="sub">準備できたら${challenge.length}桁の数字列を表示します。表示は約${(challenge.displayMs/1000).toFixed(1)}秒です。</div><button class="btn primary" id="memoryReady">表示する</button></div><div class="rules">数字は左から順番に覚えます。表示後は数字だけを入力してください。</div>`;
   ctx.root.querySelector('#memoryReady').onclick=()=>{
-    ctx.root.innerHTML=`<div class="eyebrow">MEMORIZE</div><div class="memory-sequence">${sequence.join(' ')}</div><div class="sub">覚えてください</div>`;
-    life.timer=setTimeout(()=>answer(ctx,state,life,sequence),2500);
+    ctx.root.innerHTML=`<div class="eyebrow">MEMORIZE · ${soloDifficultyLabel(challenge.difficulty).toUpperCase()}</div><div class="memory-sequence">${sequence.join(' ')}</div><div class="sub">覚えてください</div>`;
+    life.timer=setTimeout(()=>answer(ctx,state,life,sequence,challenge),challenge.displayMs);
   };
 }
 
-function answer(ctx,state,life,sequence){
+function answer(ctx,state,life,sequence,challenge){
   if(life.destroyed)return;
   life.timer=null;
-  ctx.root.innerHTML=`<div class="eyebrow">RECALL</div><div class="prompt compact">数字列を入力</div><input id="memoryAnswer" class="memory-input" inputmode="numeric" pattern="[0-9]*" maxlength="${sequence.length}" autocomplete="off" placeholder="${'•'.repeat(sequence.length)}"><button class="btn primary full" id="memorySubmit">回答する</button><div class="rules">${sequence.length}桁。1桁違いまで部分点があります。</div>`;
+  ctx.root.innerHTML=`<div class="eyebrow">RECALL · ${soloDifficultyLabel(challenge.difficulty).toUpperCase()}</div><div class="prompt compact">数字列を入力</div><input id="memoryAnswer" class="memory-input" inputmode="numeric" pattern="[0-9]*" maxlength="${sequence.length}" autocomplete="off" placeholder="${'•'.repeat(sequence.length)}"><button class="btn primary full" id="memorySubmit">回答する</button><div class="rules">${sequence.length}桁。1桁違いまで部分点があります。</div>`;
   const input=ctx.root.querySelector('#memoryAnswer');input.focus();
   ctx.root.querySelector('#memorySubmit').onclick=()=>{
     const score=memoryScore(sequence,input.value);state.scores[state.player]=score;

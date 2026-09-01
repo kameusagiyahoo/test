@@ -38,7 +38,7 @@ test('service worker precaches core PWA assets and all 24 game modules',()=>{
 });
 
 test('service worker has navigation fallback and versioned cache',()=>{
-  assert.match(sw,/CACHE_NAME='party-pocket-v8\.25\.0'/);
+  assert.match(sw,/CACHE_NAME='party-pocket-v8\.26\.0'/);
   assert.match(sw,/request\.mode==='navigate'/);
   assert.match(sw,/caches\.match\('\.\/index\.html'\)/);
   assert.match(sw,/SKIP_WAITING/);
