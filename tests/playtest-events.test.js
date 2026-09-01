@@ -19,14 +19,18 @@ test('event store records contextual ratings newest first',()=>{
   let now=100;
   const store=new PlaytestEventStore(memoryStorage(),()=>now++);
   store.record('code',scores(4,3,5,4),{mode:'party',playerCount:4});
+  store.record('memory',scores(5,4,5,5),{mode:'single',playerCount:1,difficulty:'hard'});
   store.record('gate',scores(5,4,4,5),{mode:'single',playerCount:1});
   const all=store.all();
-  assert.equal(all.length,2);
+  assert.equal(all.length,3);
   assert.equal(all[0].gameId,'gate');
   assert.equal(all[0].mode,'single');
   assert.equal(all[0].playerCount,1);
-  assert.equal(all[1].mode,'party');
-  assert.equal(all[1].playerCount,4);
+  assert.equal(all[1].gameId,'memory');
+  assert.equal(all[1].difficulty,'hard');
+  assert.equal(all[2].mode,'party');
+  assert.equal(all[2].playerCount,4);
+  assert.equal(all[2].difficulty,null);
 });
 
 test('event store rejects incomplete or out-of-range four-axis scores',()=>{
