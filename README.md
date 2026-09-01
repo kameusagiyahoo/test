@@ -22,6 +22,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - Achievements / Milestonesを履歴から自動判定し、進捗付きで表示
 - Party RecapとPlayer Profileを端末内生成PNGとして共有可能
 - Season Boardで月ごとの勝利数・Party優勝・MVP・前月差を表示
+- Game Insightsでゲーム単位の実績・Playtest・Health根拠を統合表示
 
 ## Games
 
@@ -161,6 +162,18 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - 上位3人をTOP 3として表示
 - 月間順位から既存Player Profileへ移動可能
 
+## Game Insights / Health Detail
+- Game Guideからゲーム単位の分析画面を開ける
+- Game Health一覧からも直接Insightsへ移動
+- 完了試合数 / Single・Party比率 / 直近30日とその前30日のプレイ差を表示
+- 何人プレイで遊ばれたかを人数別に集計
+- プレイヤー別に試合数 / 勝利数 / 勝率を表示
+- Playtest 4軸の累積平均と回答数を表示
+- Game Healthのステータス / 警告理由 / 次の改善アクションを同画面に表示
+- 直近10件の結果を表示
+- Playtestの個別評価時刻はまだ保存していないため、評価の時系列トレンドは推測しない
+- 新しい保存形式は作らず、既存Stats / Playtest / Healthから都度算出
+
 ## Modes
 
 ### Solo Challenge
@@ -291,6 +304,7 @@ src/
 │  ├ achievements.js
 │  ├ share-card.js
 │  ├ season.js
+│  ├ game-insights.js
 │  └ transport.js
 └ games/
    ├ sync.js
