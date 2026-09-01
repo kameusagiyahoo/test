@@ -236,7 +236,18 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - DONEへ移した瞬間の結果をfinalResultとして固定保存し、その後のレビューで結果が変わらない
 - DONE → PLANNEDへ戻すとBaseline / finalResultをリセットして再実験可能
 - Improvement QueueとGame Insightsの両方でBefore件数 / After件数 / 4軸差を表示
+- Experiment Learningsで完了実験をゲーム別・起点別に横断集計
 - 新しいlocalStorageキーは増やさず、既存Improvement Queue V1の任意フィールドとして保存
+
+## Experiment Dashboard / Learnings
+- DONEかつBefore/After判定済みの実験だけを横断集計
+- evaluated / improved / success rate / 平均Quality差を表示
+- Health / Context / Manual起点ごとに完了数・改善数・悪化数・平均Quality差を比較
+- ゲーム別に完了実験数 / improved / worse / 平均Quality差を表示
+- What WorkedはQuality改善幅の大きい順、What Did Not Workは悪化幅の大きい順
+- FLAT実験も別一覧で確認可能
+- 旧DONE実験などfinalResultがないものは集計対象外として件数だけ明示
+- 新しい保存形式は増やさず、Improvement QueueのfinalResultから都度算出
 
 ## Modes
 
@@ -380,6 +391,7 @@ src/
 │  ├ solo-analytics.js
 │  ├ improvement-queue.js
 │  ├ experiment-evaluation.js
+│  ├ experiment-learnings.js
 │  └ transport.js
 └ games/
    ├ sync.js
