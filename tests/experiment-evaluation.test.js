@@ -5,6 +5,7 @@ import {
 } from '../src/core/experiment-evaluation.js';
 
 const scores=(fun,clarity,brain,replay)=>({fun,clarity,brain,replay});
+const event=(at,scores,extra={})=>({mode:'single',playerCount:1,at,scores,...extra});
 
 test('context experiment tracks the lower-rated mode only',()=>{
   assert.deepEqual(
