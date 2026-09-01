@@ -12,6 +12,7 @@ import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBack
 import {PlayerGroupStore,samePlayers} from './core/groups.js';
 import {SavedPartyStore} from './core/party-presets.js';
 import {PartyHistoryStore,partyLeadChanges,partyMvp} from './core/party-history.js';
+import {buildPlayerProfile,buildPlayerProfiles,topPlayerRecords} from './core/player-profile.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -51,7 +52,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.19.0';
+const APP_VERSION='8.20.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -329,22 +330,53 @@ function formatPlayedAt(at){
 
 function renderStatsDashboard(){
   disposeActiveGame();
-  const games=listGames(),byId=new Map(games.map(g=>[g.id,g])),report=stats.report(games.map(g=>g.id));
+  const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g])),report=stats.report(ids);
   const gameRows=report.gameStats.map(row=>({...row,game:byId.get(row.gameId)}));
+  const profiles=buildPlayerProfiles(stats.history().filter(e=>ids.includes(e.gameId)),partyHistory.history(ids));
+  const records=topPlayerRecords(profiles);
   const mostPlayed=gameRows[0];
   updateBadge('LOCAL STATS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="statsBack">←</button><div><div class="eyebrow">LOCAL STATS</div><div class="screen-title">プレイ履歴と勝率</div></div></div>
   <section class="lab-summary stats-summary"><div><b>${report.totalPlays}</b><span>記録試合</span></div><div><b>${report.gamesPlayed}</b><span>/ ${games.length} games</span></div><div><b>${report.playerStats.length}</b><span>players</span></div></section>
   <div class="lab-note">Singleは5点先取で完走した時に1試合、Partyは各ラウンド終了時に1試合として記録します。途中離脱は集計しません。</div>
   ${mostPlayed?`<section class="stat-highlight"><div class="eyebrow">MOST PLAYED</div><b>${mostPlayed.game?.emoji||''} ${esc(mostPlayed.game?.title||mostPlayed.gameId)}</b><span>${mostPlayed.plays}試合</span></section>`:''}
-  <div class="section-head compact-head"><h2>Players</h2><span class="muted">勝利数 / 勝率</span></div>
-  <section class="stats-list">${report.playerStats.length?report.playerStats.map((p,i)=>`<div class="stats-row"><span class="stats-rank">${String(i+1).padStart(2,'0')}</span><span><b>${esc(p.name)}</b><small>${p.plays}試合 · Single ${p.single} / Party ${p.party}</small></span><span class="stats-value"><b>${p.wins}勝</b><small>${percent(p.winRate)}</small></span></div>`).join(''):'<div class="catalog-empty">まだ完了した試合がありません。</div>'}</section>
+  ${profiles.length?`<section class="record-strip"><div><span>最多勝</span><b>${records.mostWins?esc(records.mostWins.name)+' '+records.mostWins.wins+'勝':'—'}</b></div><div><span>最高勝率</span><b>${records.bestWinRate?esc(records.bestWinRate.name)+' '+percent(records.bestWinRate.winRate):'5試合以上で表示'}</b></div><div><span>Party最多勝</span><b>${records.mostPartyWins?esc(records.mostPartyWins.name)+' '+records.mostPartyWins.partyWins+'勝':'—'}</b></div><div><span>MVP</span><b>${records.mostMvp?esc(records.mostMvp.name)+' '+records.mostMvp.mvpCount+'回':'—'}</b></div></section>`:''}
+  <div class="section-head compact-head"><h2>Players</h2><span class="muted">タップでプロフィール</span></div>
+  <section class="stats-list">${profiles.length?profiles.map((p,i)=>`<button class="stats-row player-profile-row" data-player-profile="${encodeURIComponent(p.name)}"><span class="stats-rank">${String(i+1).padStart(2,'0')}</span><span><b>${esc(p.name)}</b><small>${p.plays}試合 · ${p.partySessions} Party · MVP ${p.mvpCount}回</small></span><span class="stats-value"><b>${p.wins}勝</b><small>${percent(p.winRate)}</small></span></button>`).join(''):'<div class="catalog-empty">まだ完了した試合がありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Games</h2><span class="muted">プレイ回数</span></div>
   <section class="stats-list">${gameRows.length?gameRows.map(row=>`<button class="stats-row game-stat-row" data-game="${row.gameId}"><span class="lab-symbol">${row.game?.emoji||''}</span><span><b>${esc(row.game?.title||row.gameId)}</b><small>Single ${row.single} · Party ${row.party}${row.leader?` ·最多勝 ${esc(row.leader.name)} ${row.leader.wins}勝`:''}</small></span><span class="stats-value"><b>${row.plays}</b><small>plays</small></span></button>`).join(''):'<div class="catalog-empty">ゲーム別データはまだありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Recent results</h2><span class="muted">最大20件</span></div>
   <section class="history-list">${report.recent.length?report.recent.map(entry=>{const g=byId.get(entry.gameId),winnerNames=entry.winners.map(i=>entry.players[i]).filter(Boolean);return`<div class="history-row"><span class="history-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||entry.gameId)}</b><small>${entry.mode==='party'?'Party round':'Single'} · ${winnerNames.length?`勝者 ${winnerNames.map(esc).join(' & ')}`:'勝者なし'}</small></span><time>${formatPlayedAt(entry.at)}</time></div>`}).join(''):'<div class="catalog-empty">履歴はまだありません。</div>'}</section>`;
   app.querySelector('#statsBack').onclick=renderHome;
+  app.querySelectorAll('[data-player-profile]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.playerProfile)));
   app.querySelectorAll('.game-stat-row[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+}
+
+function profileResultLabel(result){
+  return result==='win'?'勝':result==='draw'?'分':'敗';
+}
+
+function renderPlayerProfile(name){
+  disposeActiveGame();
+  const games=listGames(),ids=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
+  const profile=buildPlayerProfile(name,stats.history().filter(e=>ids.includes(e.gameId)),partyHistory.history(ids));
+  if(!profile.plays&&!profile.partySessions)return renderStatsDashboard();
+  const topGames=profile.gameStats.slice(0,3);
+  updateBadge('PLAYER PROFILE');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="profileBack">←</button><div><div class="eyebrow">PLAYER PROFILE</div><div class="screen-title">${esc(profile.name)}</div></div></div>
+  <section class="profile-hero"><div class="profile-monogram">${esc(profile.name.slice(0,1).toUpperCase())}</div><div><div class="eyebrow">CAREER</div><h2>${esc(profile.name)}</h2><p>${profile.plays}試合 · ${profile.wins}勝 · 勝率 ${percent(profile.winRate)}</p></div></section>
+  <section class="profile-kpis"><div><b>${profile.plays}</b><span>games</span></div><div><b>${profile.wins}</b><span>wins</span></div><div><b>${percent(profile.winRate)}</b><span>win rate</span></div><div><b>${profile.gamesPlayed}</b><span>titles</span></div></section>
+  <div class="section-head compact-head"><h2>Party Career</h2><span class="muted">完了Party単位</span></div>
+  <section class="profile-kpis party-kpis"><div><b>${profile.partySessions}</b><span>Party</span></div><div><b>${profile.partyWins}</b><span>Party wins</span></div><div><b>${profile.mvpCount}</b><span>MVP</span></div><div><b>${profile.partyPoints}</b><span>Party pt</span></div></section>
+  <div class="section-head compact-head"><h2>Best Games</h2><span class="muted">勝数 → 勝率</span></div>
+  <section class="profile-game-list">${topGames.length?topGames.map((row,index)=>{const g=byId.get(row.gameId);return`<button class="profile-game-row" data-game="${row.gameId}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span class="lab-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||row.gameId)}</b><small>${row.plays}試合 · ${row.wins}勝</small></span><span class="stats-value"><b>${percent(row.winRate)}</b><small>win rate</small></span></button>`}).join(''):'<div class="catalog-empty">ゲーム別データがありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Rivals</h2><span class="muted">Party最終スコア比較</span></div>
+  <section class="rival-list">${profile.rivals.length?profile.rivals.map(r=>`<div class="rival-row"><span><b>${esc(r.name)}</b><small>${r.meetings} Partyで対戦</small></span><span class="rival-record"><b>${r.wins}-${r.draws}-${r.losses}</b><small>勝-分-敗</small></span></div>`).join(''):'<div class="catalog-empty">対戦相手データがありません。</div>'}</section>
+  <div class="section-head compact-head"><h2>Recent Party Form</h2><span class="muted">直近5回</span></div>
+  <section class="form-strip">${profile.recentParty.length?profile.recentParty.map(row=>`<button class="form-result ${row.result}" data-profile-party="${row.id}" title="${formatPartyDate(row.completedAt)}">${profileResultLabel(row.result)}</button>`).join(''):'<span class="muted">Party履歴なし</span>'}</section>`;
+  app.querySelector('#profileBack').onclick=renderStatsDashboard;
+  app.querySelectorAll('[data-game]').forEach(button=>button.onclick=()=>renderGameDetail(button.dataset.game));
+  app.querySelectorAll('[data-profile-party]').forEach(button=>button.onclick=()=>renderPartyHistoryDetail(button.dataset.profileParty));
 }
 
 function healthStatusLabel(status){
