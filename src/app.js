@@ -6,7 +6,7 @@ import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,ga
 import {gameGuide} from './core/game-guide.js';
 import {StatsStore,winnerIndexesFromScores} from './core/stats.js';
 import {buildHealthReport} from './core/health.js';
-import {SoloProgressStore,SOLO_GAME_IDS} from './core/solo.js';
+import {SoloProgressStore,SOLO_GAME_IDS,SOLO_DIFFICULTIES,normalizeSoloDifficulty,soloDifficultyLabel} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
 import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {PlayerGroupStore,samePlayers} from './core/groups.js';
@@ -58,7 +58,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.25.0';
+const APP_VERSION='8.26.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -181,6 +181,15 @@ function gameInsightData(id){
 function insightAxisLabel(id){
   return id==='fun'?'面白さ':id==='clarity'?'分かりやすさ':id==='brain'?'頭を使う度':'もう一度遊びたい';
 }
+function soloDifficultyDetail(gameId,difficulty){
+  const level=normalizeSoloDifficulty(difficulty);
+  const details={
+    memory:{easy:'5桁 · 約3.2秒',normal:'6〜7桁 · 約2.5秒',hard:'8〜9桁 · 約1.8秒'},
+    route:{easy:'3マス · 数字1〜6',normal:'4マス · 数字1〜8',hard:'5マス · 数字1〜9'},
+    pattern:{easy:'加算・減算',normal:'交互・差分',hard:'等比・複合規則'}
+  };
+  return details[gameId]?.[level]||soloDifficultyLabel(level);
+}
 
 function renderGameInsights(id){
   disposeActiveGame();
@@ -209,17 +218,20 @@ function renderGameInsights(id){
   app.querySelectorAll('[data-insight-player]').forEach(button=>button.onclick=()=>renderPlayerProfile(decodeURIComponent(button.dataset.insightPlayer)));
 }
 
-function renderGameDetail(id){
+function renderGameDetail(id,difficulty='normal'){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
+  const soloEligible=session.players.length===1&&SOLO_GAME_IDS.includes(id),soloDifficulty=soloEligible?normalizeSoloDifficulty(difficulty):'normal';
   const meta=gameMeta(id),guide=gameGuide(id),favorite=library.isFavorite(id),insight=gameInsightData(id);
   updateBadge('GAME GUIDE');
+  const soloDifficultyHtml=soloEligible?`<section class="solo-difficulty-picker"><div><div class="eyebrow">SOLO DIFFICULTY</div><h3>${soloDifficultyLabel(soloDifficulty)}</h3><p>${soloDifficultyDetail(id,soloDifficulty)}</p></div><div class="solo-difficulty-buttons">${SOLO_DIFFICULTIES.map(level=>`<button class="solo-difficulty-button ${level===soloDifficulty?'active':''}" data-solo-difficulty="${level}"><b>${soloDifficultyLabel(level)}</b><small>${soloDifficultyDetail(id,level)}</small></button>`).join('')}</div></section>`:'';
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="detailBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME GUIDE</div><div class="screen-title">${game.title}</div></div></div></div>
-  <section class="panel game-detail"><div class="detail-facts"><span>${difficultyLabel(meta.difficulty)}</span><span>約${meta.minutes}分</span><span>${playerRangeLabel(meta)}推奨</span></div><button class="game-insight-preview ${insight.health.status}" id="detailInsights"><span><span class="eyebrow">GAME INSIGHTS</span><b>${insight.plays} plays · ${healthStatusLabel(insight.health.status)}</b><small>${gameInsightHeadline(insight)} · 30日差 ${trendLabel(insight)}</small></span><span class="recommend-arrow">→</span></button><div class="detail-section"><div class="eyebrow">OBJECTIVE</div><h3>${esc(guide.objective)}</h3></div><div class="detail-section"><div class="eyebrow">HOW TO PLAY</div><ol class="rule-steps">${guide.rules.map(rule=>`<li>${esc(rule)}</li>`).join('')}</ol></div><div class="detail-grid"><div class="detail-note"><div class="eyebrow">WIN / SCORE</div><p>${esc(guide.scoring)}</p></div><div class="detail-note"><div class="eyebrow">EXAMPLE</div><p>${esc(guide.example)}</p></div></div><div class="detail-actions"><button class="btn quiet favorite-button ${favorite?'active':''}" id="favoriteToggle">${favorite?'★ お気に入り済み':'☆ お気に入り'}</button><button class="btn primary" id="detailStart">このゲームを始める</button></div></section>`;
+  <section class="panel game-detail"><div class="detail-facts"><span>${difficultyLabel(meta.difficulty)}</span><span>約${meta.minutes}分</span><span>${playerRangeLabel(meta)}推奨</span></div>${soloDifficultyHtml}<button class="game-insight-preview ${insight.health.status}" id="detailInsights"><span><span class="eyebrow">GAME INSIGHTS</span><b>${insight.plays} plays · ${healthStatusLabel(insight.health.status)}</b><small>${gameInsightHeadline(insight)} · 30日差 ${trendLabel(insight)}</small></span><span class="recommend-arrow">→</span></button><div class="detail-section"><div class="eyebrow">OBJECTIVE</div><h3>${esc(guide.objective)}</h3></div><div class="detail-section"><div class="eyebrow">HOW TO PLAY</div><ol class="rule-steps">${guide.rules.map(rule=>`<li>${esc(rule)}</li>`).join('')}</ol></div><div class="detail-grid"><div class="detail-note"><div class="eyebrow">WIN / SCORE</div><p>${esc(guide.scoring)}</p></div><div class="detail-note"><div class="eyebrow">EXAMPLE</div><p>${esc(guide.example)}</p></div></div><div class="detail-actions"><button class="btn quiet favorite-button ${favorite?'active':''}" id="favoriteToggle">${favorite?'★ お気に入り済み':'☆ お気に入り'}</button><button class="btn primary" id="detailStart">${soloEligible?`${soloDifficultyLabel(soloDifficulty)}で始める`:'このゲームを始める'}</button></div></section>`;
   app.querySelector('#detailBack').onclick=renderHome;
   app.querySelector('#favoriteToggle').onclick=()=>{library.toggleFavorite(id);renderGameDetail(id)};
   app.querySelector('#detailInsights').onclick=()=>renderGameInsights(id);
-  app.querySelector('#detailStart').onclick=()=>{session.startSingle();startGame(id)};
+  app.querySelectorAll('[data-solo-difficulty]').forEach(button=>button.onclick=()=>renderGameDetail(id,button.dataset.soloDifficulty));
+  app.querySelector('#detailStart').onclick=()=>{session.startSingle();startGame(id,{difficulty:soloDifficulty})};
 }
 
 homeButton.onclick=()=>{disposeActiveGame();renderHome()};
@@ -264,7 +276,7 @@ function renderHome(){
   ${!isStandalone()?`<section class="install-card"><div><div class="eyebrow">INSTALL</div><h3>ホーム画面から起動する</h3><p>${isIOS()?'Safariの共有ボタン →「ホーム画面に追加」で、アプリのように独立起動できます。':'対応ブラウザではParty Pocketを端末へインストールできます。'}</p></div><button class="btn quiet" id="installApp">${pwaInstallReady&&canPromptInstall()?'インストール':'追加方法'}</button></section>`:''}
   ${!isOnline()?'<div class="offline-banner">OFFLINE · キャッシュ済みゲームはそのまま遊べます</div>':''}
   ${pwaUpdateRegistration?'<section class="update-card"><div><div class="eyebrow">UPDATE READY</div><b>新しいParty Pocketがあります</b></div><button class="btn primary" id="applyUpdate">更新する</button></section>':''}
-  ${session.players.length===1&&dailyGame?`<section class="solo-daily ${daily.cleared?'cleared':''}"><div><div class="eyebrow">DAILY SOLO</div><h3>${dailyGame.emoji} ${dailyGame.title}</h3><p>${daily.maxRounds}ラウンド以内に5点到達でクリア。</p><div class="solo-daily-meta"><span>${daily.cleared?'今日クリア済み':'今日の挑戦'}</span><span>連続 ${daily.streak}日</span><span>Solo完走 ${soloSummary.totalClears}回</span></div></div><button class="btn primary" id="dailySolo">${daily.cleared?'もう一度':'挑戦する'}</button></section><div class="section-head"><h2>Solo Progress</h2><span class="muted">自己ベスト</span></div><section class="solo-progress-list">${SOLO_GAME_IDS.map(id=>{const g=byId.get(id),p=soloProgress.game(id);return`<button class="solo-progress-row" data-game="${id}"><span class="recommend-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||id)}</b><small>最短 ${p?.bestRounds??'—'}ラウンド · 連続成功 ${p?.bestStreak||0} · 完走 ${p?.clears||0}回</small></span><span class="recommend-arrow">→</span></button>`}).join('')}</section>`:''}
+  ${session.players.length===1&&dailyGame?`<section class="solo-daily ${daily.cleared?'cleared':''}"><div><div class="eyebrow">DAILY SOLO · ${soloDifficultyLabel(daily.difficulty).toUpperCase()}</div><h3>${dailyGame.emoji} ${dailyGame.title}</h3><p>${soloDifficultyLabel(daily.difficulty)} · ${soloDifficultyDetail(daily.gameId,daily.difficulty)}。 ${daily.maxRounds}ラウンド以内に5点到達でクリア。</p><div class="solo-daily-meta"><span>${daily.cleared?'今日クリア済み':'今日の挑戦'}</span><span>連続 ${daily.streak}日</span><span>Solo完走 ${soloSummary.totalClears}回</span></div></div><button class="btn primary" id="dailySolo">${daily.cleared?'もう一度':'挑戦する'}</button></section><div class="section-head"><h2>Solo Progress</h2><span class="muted">難易度別ベスト</span></div><section class="solo-progress-list">${SOLO_GAME_IDS.map(id=>{const g=byId.get(id),p=soloProgress.game(id),e=p?.difficulties?.easy,n=p?.difficulties?.normal,h=p?.difficulties?.hard;return`<button class="solo-progress-row" data-game="${id}"><span class="recommend-symbol">${g?.emoji||''}</span><span><b>${esc(g?.title||id)}</b><small>E ${e?.bestRounds??'—'}R · N ${n?.bestRounds??'—'}R · H ${h?.bestRounds??'—'}R · 完走 ${p?.clears||0}回</small></span><span class="recommend-arrow">→</span></button>`}).join('')}</section>`:''}
   <section class="playtest-entry"><div><div class="eyebrow">PLAYTEST LAB</div><h3>24ゲームの弱点を見る</h3><p>面白さ・分かりやすさ・頭を使う度・再プレイ意向を端末内で集計します。</p></div><button class="btn quiet" id="playtestLab">評価を見る</button></section>
   <section class="playtest-entry stats-entry"><div><div class="eyebrow">LOCAL STATS</div><h3>プレイ履歴と勝率を見る</h3><p>Singleの完走とParty各ラウンドを記録し、プレイヤー別・ゲーム別に集計します。</p></div><button class="btn quiet" id="statsDashboard">成績を見る</button></section>
   <section class="playtest-entry season-entry"><div><div class="eyebrow">SEASON BOARD · ${esc(currentSeason.label)}</div><h3>${currentSeason.rows.length?`${esc(currentSeason.rows[0].name)}が${currentSeason.rows[0].wins}勝で首位`:'今月のランキングを始める'}</h3><p>${currentSeason.totalPlays}試合 · ${currentSeason.partySessions} Party · ${currentSeason.players} players。前月との差も自動比較します。</p></div><button class="btn quiet" id="seasonBoard">月間順位</button></section>
@@ -293,7 +305,7 @@ function renderHome(){
     const group=playerGroups.get(button.dataset.quickGroup);if(!group)return;
     session.savePlayers(group.players);playerGroups.touch(group.id);
     if(group.players.length===1){
-      const gameId=soloProgress.daily().gameId;session.startSingle();return startGame(gameId);
+      const daily=soloProgress.daily();session.startSingle();return startGame(daily.gameId,{difficulty:daily.difficulty});
     }
     return startSmartParty(3,{players:group.players});
   });
@@ -316,7 +328,7 @@ function renderHome(){
     const waiting=pwaUpdateRegistration?.waiting;
     if(waiting){toast('更新を適用します');waiting.postMessage({type:'SKIP_WAITING'})}
   });
-  app.querySelector('#dailySolo')?.addEventListener('click',()=>renderGameDetail(daily.gameId));
+  app.querySelector('#dailySolo')?.addEventListener('click',()=>renderGameDetail(daily.gameId,daily.difficulty));
   if(app.querySelector('.solo-progress-list'))bindGameLaunch(app.querySelector('.solo-progress-list'));
   app.querySelector('#playtestLab').onclick=renderPlaytestLab;
   app.querySelector('#statsDashboard').onclick=renderStatsDashboard;
@@ -790,13 +802,14 @@ function renderScorebar(current=-1){
   document.querySelectorAll('[data-scorebar]').forEach(bar=>bar.innerHTML=session.players.map((name,i)=>`<div class="score ${i===current?'current':''}"><span>${esc(name)}</span><b>${session.scores[i]||0}</b></div>`).join(''));
 }
 
-function startGame(id){
+function startGame(id,{difficulty='normal'}={}){
   disposeActiveGame();const game=getGame(id);if(!game)return renderHome();library.touchRecent(id);if(session.mode==='single')lastSingleGameId=id;
-  if(session.mode==='single'&&session.players.length===1&&SOLO_GAME_IDS.includes(id)){soloRun={gameId:id,rounds:0,currentStreak:0,maxStreak:0,lastScore:0};lastSoloResult=null}else if(session.mode==='single'){soloRun=null;lastSoloResult=null}
-  updateBadge(session.mode==='party'?`Round ${session.party.round+1}/${session.party.totalRounds}`:'First to 5');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="backButton">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">${session.mode==='party'?'PARTY ROUND':'SINGLE GAME'}</div><div class="screen-title">${game.title}</div></div></div></div><div class="scorebar" data-scorebar></div><section class="stage" id="gameStage"></section>`;
+  const soloDifficulty=normalizeSoloDifficulty(difficulty);
+  if(session.mode==='single'&&session.players.length===1&&SOLO_GAME_IDS.includes(id)){soloRun={gameId:id,difficulty:soloDifficulty,rounds:0,currentStreak:0,maxStreak:0,lastScore:0};lastSoloResult=null}else if(session.mode==='single'){soloRun=null;lastSoloResult=null}
+  updateBadge(session.mode==='party'?`Round ${session.party.round+1}/${session.party.totalRounds}`:soloRun?`Solo · ${soloDifficultyLabel(soloDifficulty)}`:'First to 5');
+  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="backButton">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">${session.mode==='party'?'PARTY ROUND':soloRun?`SINGLE GAME · ${soloDifficultyLabel(soloRun.difficulty).toUpperCase()}`:'SINGLE GAME'}</div><div class="screen-title">${game.title}</div></div></div></div><div class="scorebar" data-scorebar></div><section class="stage" id="gameStage"></section>`;
   app.querySelector('#backButton').onclick=renderHome;renderScorebar();
-  const ctx={root:app.querySelector('#gameStage'),session,esc,toast,renderScorebar,completeRound:restart=>completeRound(restart)};
+  const ctx={root:app.querySelector('#gameStage'),session,esc,toast,renderScorebar,soloDifficulty:soloRun?.difficulty||'normal',completeRound:restart=>completeRound(restart)};
   activeCleanup=game.mount(ctx)||null;
 }
 
@@ -814,8 +827,8 @@ function completeRound(restart){
       const winners=session.winnerIndexes(false);
       stats.record({gameId:lastSingleGameId,mode:'single',players:[...session.players],scores:[...session.scores],winners});
       if(soloRun){
-        soloProgress.recordRun(lastSingleGameId,{rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,completed:true});
-        lastSoloResult={gameId:lastSingleGameId,rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,game:soloProgress.game(lastSingleGameId),daily:soloProgress.daily()};
+        soloProgress.recordRun(lastSingleGameId,{difficulty:soloRun.difficulty,rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,completed:true});
+        lastSoloResult={gameId:lastSingleGameId,difficulty:soloRun.difficulty,rounds:soloRun.rounds,maxStreak:soloRun.maxStreak,game:soloProgress.game(lastSingleGameId,soloRun.difficulty),daily:soloProgress.daily()};
       }
       disposeActiveGame();return renderWinner(false,lastSingleGameId);
     }
@@ -854,7 +867,7 @@ function renderWinner(isParty,ratingGameId=null){
   disposeActiveGame();const winners=session.winnerIndexes(isParty),scores=isParty?session.partyScores:session.scores;
   const completedSchedule=isParty?[...session.party.schedule]:[];
   updateBadge('RESULT');
-  const soloResultHtml=!isParty&&lastSoloResult&&lastSoloResult.gameId===ratingGameId?`<section class="solo-result-card"><div class="eyebrow">SOLO RESULT</div><div class="solo-result-grid"><div><b>${lastSoloResult.rounds}</b><span>クリアラウンド</span></div><div><b>${lastSoloResult.game.bestRounds??'—'}</b><span>自己ベスト</span></div><div><b>${lastSoloResult.maxStreak}</b><span>連続成功</span></div></div>${lastSoloResult.daily.gameId===ratingGameId&&lastSoloResult.daily.cleared?`<div class="solo-daily-clear">DAILY CLEAR · ${lastSoloResult.daily.streak}日連続</div>`:''}</section>`:'';
+  const soloResultHtml=!isParty&&lastSoloResult&&lastSoloResult.gameId===ratingGameId?`<section class="solo-result-card"><div class="eyebrow">SOLO RESULT · ${soloDifficultyLabel(lastSoloResult.difficulty).toUpperCase()}</div><div class="solo-result-difficulty">${soloDifficultyLabel(lastSoloResult.difficulty)} · ${soloDifficultyDetail(lastSoloResult.gameId,lastSoloResult.difficulty)}</div><div class="solo-result-grid"><div><b>${lastSoloResult.rounds}</b><span>クリアラウンド</span></div><div><b>${lastSoloResult.game.bestRounds??'—'}</b><span>この難易度のベスト</span></div><div><b>${lastSoloResult.maxStreak}</b><span>連続成功</span></div></div>${lastSoloResult.daily.gameId===ratingGameId&&lastSoloResult.daily.difficulty===lastSoloResult.difficulty&&lastSoloResult.daily.cleared?`<div class="solo-daily-clear">DAILY CLEAR · ${lastSoloResult.daily.streak}日連続</div>`:''}</section>`:'';
   const recapHtml=isParty&&lastPartyRecap?partyRecapHtml(lastPartyRecap,{compact:true}):'';
   const savePartyHtml=isParty?`<section class="party-save-card"><div><div class="eyebrow">SAVE THIS PARTY</div><b>この${completedSchedule.length}ラウンド構成を保存</b><small>ゲーム順もそのまま保存します。</small></div><div class="party-save-form"><input id="partyPresetName" maxlength="32" placeholder="例: 定番3本 / 頭脳戦ベスト"><button class="btn quiet" id="savePartyPreset">構成を保存</button></div></section>`:'';
   app.innerHTML=`<section class="panel winner"><div class="winner-mark">RESULT</div><div class="eyebrow">${isParty?'PARTY COMPLETE':'GAME COMPLETE'}</div><h2>${winners.map(i=>esc(session.players[i])).join(' & ')}</h2><p class="muted">${winners.length>1?'同点首位':'1位'}</p><div class="result-list">${rankingHtml(scores,isParty?'Party pt':'pt')}</div>${recapHtml}${isParty&&lastPartyRecap?'<div class="result-share-row"><button class="btn quiet full" id="sharePartyResult">Party結果を画像で共有</button></div>':''}${savePartyHtml}${soloResultHtml}${ratingGameId?playtestPromptHtml(ratingGameId):''}<div class="actions"><button class="btn quiet" id="homeResult">ホーム</button><button class="btn primary" id="againResult">もう一度</button></div></section>`;
@@ -864,7 +877,7 @@ function renderWinner(isParty,ratingGameId=null){
   app.querySelector('#homeResult').onclick=renderHome;
   app.querySelector('#againResult').onclick=()=>{
     if(isParty){startTrackedSchedule(completedSchedule);return renderPartyIntermission(true)}
-    if(lastSingleGameId){session.startSingle();return startGame(lastSingleGameId)}renderHome();
+    if(lastSingleGameId){const difficulty=lastSoloResult?.difficulty||'normal';session.startSingle();return startGame(lastSingleGameId,{difficulty})}renderHome();
   };
 }
 
