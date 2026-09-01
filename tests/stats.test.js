@@ -57,3 +57,26 @@ test('history is capped at 200 completed results',()=>{
   for(let i=0;i<205;i++)store.record({gameId:'clock',mode:'party',players:['A','B'],scores:[1,0],winners:[0]});
   assert.equal(store.history().length,200);
 });
+
+test('stats preserve optional solo difficulty and clear-round context',()=>{
+  const store=new StatsStore(memoryStorage(),()=>1234);
+  const entry=store.record({
+    gameId:'memory',mode:'single',players:['A'],scores:[6],winners:[0],
+    difficulty:'hard',clearRounds:4
+  });
+  assert.equal(entry.difficulty,'hard');
+  assert.equal(entry.clearRounds,4);
+  const restored=store.history()[0];
+  assert.equal(restored.difficulty,'hard');
+  assert.equal(restored.clearRounds,4);
+});
+
+test('invalid stats context is normalized away without breaking legacy entries',()=>{
+  const store=new StatsStore(memoryStorage(),()=>1234);
+  const entry=store.record({
+    gameId:'memory',mode:'single',players:['A'],scores:[5],winners:[0],
+    difficulty:'extreme',clearRounds:0
+  });
+  assert.equal(entry.difficulty,null);
+  assert.equal(entry.clearRounds,null);
+});
