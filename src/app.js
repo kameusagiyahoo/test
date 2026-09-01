@@ -22,6 +22,7 @@ import {buildSoloDifficultyAnalytics} from './core/solo-analytics.js';
 import {ImprovementQueueStore,experimentStatusLabel} from './core/improvement-queue.js';
 import {buildExperimentBaseline,evaluateExperiment,experimentOutcomeLabel} from './core/experiment-evaluation.js';
 import {buildExperimentLearnings,experimentSourceLabel} from './core/experiment-learnings.js';
+import {buildLearnedRecommendations,contextNeed,healthNeed,learnedRecommendationLabel} from './core/learned-recommendations.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {syncGame} from './games/sync.js';
 import {bombGame} from './games/bomb.js';
@@ -63,7 +64,7 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.31.0';
+const APP_VERSION='8.32.0';
 
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
@@ -247,7 +248,7 @@ function soloDifficultyDetail(gameId,difficulty){
 function renderGameInsights(id){
   disposeActiveGame();
   const game=getGame(id);if(!game)return renderHome();
-  const eventRows=playtestEvents.forGame(id),insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,eventRows),segments=buildPlaytestSegments(id,eventRows),contextSignals=contextualPlaytestSignals(segments),experiments=improvementQueue.forGame(id),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
+  const eventRows=playtestEvents.forGame(id),insight=gameInsightData(id),timeline=buildPlaytestTimeline(id,eventRows),segments=buildPlaytestSegments(id,eventRows),contextSignals=contextualPlaytestSignals(segments),experiments=improvementQueue.forGame(id),learnedNeeds=[...(insight.health?.issues||[]).map(healthNeed),...contextSignals.map(signal=>contextNeed(signal,contextSignalText(signal)))],learned=buildLearnedRecommendations(id,learnedNeeds,improvementQueue.all()),soloAnalytics=SOLO_GAME_IDS.includes(id)?buildSoloDifficultyAnalytics(id,stats.history(),soloProgress.game(id)):null,status=insight.health?.status||'data';
   updateBadge('GAME INSIGHTS');
   app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="insightBack">←</button><div class="game-heading"><span class="game-symbol small">${game.emoji}</span><div><div class="eyebrow">GAME INSIGHTS</div><div class="screen-title">${esc(game.title)}</div></div></div></div>
   <section class="insight-hero ${status}"><div><div class="eyebrow">HEALTH / TREND</div><h2>${esc(gameInsightHeadline(insight))}</h2><p>${insight.current30} plays / 直近30日 · 前30日は ${insight.previous30} plays</p></div><span class="health-status ${status}">${healthStatusLabel(status)}</span></section>
@@ -275,6 +276,12 @@ function renderGameInsights(id){
   <section class="insight-player-list">${insight.players.length?insight.players.map((row,index)=>`<button class="insight-player-row" data-insight-player="${encodeURIComponent(row.name)}"><span class="stats-rank">${String(index+1).padStart(2,'0')}</span><span><b>${esc(row.name)}</b><small>${row.plays}試合</small></span><span class="stats-value"><b>${row.wins}勝</b><small>${percent(row.winRate)}</small></span></button>`).join(''):'<div class="catalog-empty">プレイヤーデータがありません。</div>'}</section>
   <div class="section-head compact-head"><h2>Health Findings</h2><span class="health-status ${status}">${healthStatusLabel(status)}</span></div>
   <section class="insight-findings">${insight.health?.issues?.length?insight.health.issues.map((item,index)=>`<div class="health-issue ${item.severity}"><div><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></div><p>${esc(item.action)}</p><button class="mini-action" data-add-health-experiment="${index}">実験に追加</button></div>`).join(''):'<div class="health-issue healthy"><div><b>明確な警告なし</b><small>現在の閾値では問題を検出していません。</small></div><p>データを継続して蓄積する</p></div>'}</section>
+  ${learned.recommendations.length||learned.cautions.length?`<div class="section-head compact-head"><h2>Learned Recommendations</h2><span class="muted">${learned.evidenceCount} evaluated experiments</span></div>
+  <section class="learned-recommendations">
+    ${learned.recommendations.map((row,index)=>`<article class="learned-card reuse"><span class="learned-mark">REUSE</span><span><b>${esc(row.title)}</b><small>${esc(getGame(row.originGameId)?.title||row.originGameId)} · ${esc(learnedRecommendationLabel(row))} · ${esc(row.cohort)}</small><p>${esc(row.note||row.source.action||row.source.detail||'過去に改善した実験')}</p></span><button class="mini-action" data-add-learned="${index}">実験に追加</button></article>`).join('')}
+    ${learned.cautions.map(row=>`<article class="learned-card avoid"><span class="learned-mark">AVOID</span><span><b>${esc(row.title)}</b><small>${esc(getGame(row.originGameId)?.title||row.originGameId)} · ${esc(learnedRecommendationLabel(row))}</small><p>${esc(row.note||row.source.action||row.source.detail||'過去に悪化した実験')}</p></span></article>`).join('')}
+  </section>
+  <div class="lab-note">現在のHealth / Context Signalと、DONE実験のsourceを照合しています。成功実験はREUSE、悪化実験はAVOID。同じゲームの実績を優先します。</div>`:''}
   <div class="section-head compact-head"><h2>Improvement Queue</h2><span class="muted">${experiments.length} / 5</span></div>
   <section class="improvement-mini-list">${experiments.length?experiments.map(item=>{const result=experimentEvaluation(item);return`<article class="improvement-mini ${item.status}"><span class="experiment-status ${item.status}">${experimentStatusLabel(item.status)}</span><span><b>${esc(item.title)}</b><small>${item.note?esc(item.note):esc(item.source.detail||item.source.action||'メモなし')}</small>${result?`<small class="experiment-result-line ${experimentOutcomeClass(result)}">${esc(experimentResultSummary(item))}</small>`:''}</span><button class="mini-action" data-cycle-experiment="${item.id}">${experimentAdvanceLabel(item)}</button></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Health FindingやContext Signalから追加できます。</div>'}</section>
   <button class="btn quiet full" id="manualExperiment">手動で実験を追加</button>
@@ -293,6 +300,15 @@ function renderGameInsights(id){
     const key=['health',issue.type||issue.title].join(':');
     const result=improvementQueue.add({gameId:id,title:issue.action||issue.title,source:{kind:'health',key,detail:issue.detail||issue.title,action:issue.action}});
     toast(result.created?'改善実験を追加しました':'同じ実験は追加済みです');renderGameInsights(id);
+  });
+  app.querySelectorAll('[data-add-learned]').forEach(button=>button.onclick=()=>{
+    const row=learned.recommendations[+button.dataset.addLearned];if(!row)return;
+    const originGame=getGame(row.originGameId)?.title||row.originGameId;
+    const key=['learned',row.originId,row.matchedNeed.key].join(':');
+    const note=row.note||row.source.action||'過去の成功実験を再利用';
+    const detail=`${originGame}で${learnedRecommendationLabel(row)}`;
+    const result=improvementQueue.add({gameId:id,title:'再利用: '+row.title,note,source:{kind:'manual',key,detail,action:note}});
+    toast(result.created?'学習済み改善を実験に追加しました':'同じ推薦は追加済みです');renderGameInsights(id);
   });
   app.querySelectorAll('[data-cycle-experiment]').forEach(button=>button.onclick=()=>{advanceExperiment(button.dataset.cycleExperiment);renderGameInsights(id)});
   app.querySelector('#manualExperiment').onclick=()=>{

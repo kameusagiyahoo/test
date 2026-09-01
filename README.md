@@ -237,6 +237,7 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - DONE → PLANNEDへ戻すとBaseline / finalResultをリセットして再実験可能
 - Improvement QueueとGame Insightsの両方でBefore件数 / After件数 / 4軸差を表示
 - Experiment Learningsで完了実験をゲーム別・起点別に横断集計
+- Learned Recommendationsで現在の問題に似た過去の成功/失敗実験を再利用
 - 新しいlocalStorageキーは増やさず、既存Improvement Queue V1の任意フィールドとして保存
 
 ## Experiment Dashboard / Learnings
@@ -247,6 +248,17 @@ GitHub Pagesだけで動く、1〜8人向けのスマホ1台ゲーム集です�
 - What WorkedはQuality改善幅の大きい順、What Did Not Workは悪化幅の大きい順
 - FLAT実験も別一覧で確認可能
 - 旧DONE実験などfinalResultがないものは集計対象外として件数だけ明示
+- 新しい保存形式は増やさず、Improvement QueueのfinalResultから都度算出
+
+## Learned Recommendations
+- 現在のHealth Finding / Context SignalとDONE実験のsourceを照合
+- 同じHealth種別、同じContext軸・低評価側などが近いほど高スコア
+- 同じゲームで成功した実験を優先
+- IMPROVED実験はREUSEとして最大3件表示
+- WORSE実験はAVOIDとして最大3件表示
+- PLANNED / TESTING / FLAT / 未評価DONEは推薦対象外
+- REUSEから1タップで新しいImprovement Queue実験を作成可能
+- 推薦元ゲーム / Quality差 / cohortを根拠として表示
 - 新しい保存形式は増やさず、Improvement QueueのfinalResultから都度算出
 
 ## Modes
@@ -392,6 +404,7 @@ src/
 │  ├ improvement-queue.js
 │  ├ experiment-evaluation.js
 │  ├ experiment-learnings.js
+│  ├ learned-recommendations.js
 │  └ transport.js
 └ games/
    ├ sync.js
