@@ -6,6 +6,7 @@ function readJson(storage,key,fallback){
   try{const raw=storage?.getItem?.(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
 }
 function cleanText(value,max=240){return String(value||'').trim().slice(0,max)}
+function numericOrNull(value){return value==null||value===''||!Number.isFinite(Number(value))?null:Number(value)}
 function normalizeSource(source={}){
   const kind=['health','context','manual'].includes(source?.kind)?source.kind:'manual';
   return{
@@ -13,6 +14,49 @@ function normalizeSource(source={}){
     key:cleanText(source?.key,120),
     detail:cleanText(source?.detail,240),
     action:cleanText(source?.action,240)
+  };
+}
+function normalizeAxes(raw={}){
+  const axes={};
+  for(const id of ['fun','clarity','brain','replay']){
+    axes[id]=numericOrNull(raw?.[id]);
+  }
+  return axes;
+}
+function normalizeCohort(raw={}){
+  const mode=raw?.mode==='single'||raw?.mode==='party'?raw.mode:null;
+  const difficulty=['easy','normal','hard'].includes(raw?.difficulty)?raw.difficulty:null;
+  return{mode,difficulty,label:cleanText(raw?.label,40)||'All reviews'};
+}
+function normalizeBaseline(raw){
+  if(!raw||typeof raw!=='object')return null;
+  const startedAt=Number(raw.startedAt)||0,count=Math.max(0,Number(raw.count)||0);
+  return{
+    startedAt,
+    cohort:normalizeCohort(raw.cohort),
+    count,
+    axes:normalizeAxes(raw.axes),
+    quality:numericOrNull(raw.quality)
+  };
+}
+function normalizeResult(raw){
+  if(!raw||typeof raw!=='object')return null;
+  const outcome=['collecting','improved','flat','worse'].includes(raw.outcome)?raw.outcome:'collecting';
+  return{
+    outcome,
+    ready:Boolean(raw.ready),
+    cohort:normalizeCohort(raw.cohort),
+    baselineCount:Math.max(0,Number(raw.baselineCount)||0),
+    afterCount:Math.max(0,Number(raw.afterCount)||0),
+    beforeQuality:numericOrNull(raw.beforeQuality),
+    afterQuality:numericOrNull(raw.afterQuality),
+    qualityDelta:numericOrNull(raw.qualityDelta),
+    axes:Array.isArray(raw.axes)?raw.axes.map(row=>({
+      id:cleanText(row?.id,20),
+      before:numericOrNull(row?.before),
+      after:numericOrNull(row?.after),
+      delta:numericOrNull(row?.delta)
+    })).filter(row=>row.id):[]
   };
 }
 function normalize(item){
@@ -29,6 +73,9 @@ function normalize(item){
     status,
     createdAt,
     updatedAt,
+    testingStartedAt:status==='planned'?0:(Number(item.testingStartedAt)||0),
+    baseline:status==='planned'?null:normalizeBaseline(item.baseline),
+    finalResult:status==='done'?normalizeResult(item.finalResult):null,
     completedAt:status==='done'?(Number(item.completedAt)||updatedAt):0
   };
 }
@@ -37,7 +84,8 @@ export class ImprovementQueueStore{
   constructor(storage=globalThis.localStorage,now=()=>Date.now()){this.storage=storage;this.now=now}
   all(validGameIds=[]){
     const allowed=validGameIds.length?new Set(validGameIds):null;
-    return (Array.isArray(readJson(this.storage,KEY,[]))?readJson(this.storage,KEY,[]):[])
+    const raw=readJson(this.storage,KEY,[]);
+    return (Array.isArray(raw)?raw:[])
       .map(normalize).filter(Boolean)
       .filter(item=>!allowed||allowed.has(item.gameId))
       .sort((a,b)=>{
@@ -80,24 +128,45 @@ export class ImprovementQueueStore{
     const now=this.now();let updated=null;
     const next=this.all().map(item=>{
       if(item.id!==id)return item;
-      const status=IMPROVEMENT_STATUSES.includes(patch.status)?patch.status:item.status;
+      const has=key=>Object.prototype.hasOwnProperty.call(patch,key);
       updated=normalize({
         ...item,
-        title:patch.title??item.title,
-        note:patch.note??item.note,
-        status,
+        title:has('title')?patch.title:item.title,
+        note:has('note')?patch.note:item.note,
+        status:has('status')?patch.status:item.status,
+        testingStartedAt:has('testingStartedAt')?patch.testingStartedAt:item.testingStartedAt,
+        baseline:has('baseline')?patch.baseline:item.baseline,
+        finalResult:has('finalResult')?patch.finalResult:item.finalResult,
         updatedAt:now,
-        completedAt:status==='done'?(item.completedAt||now):0
+        completedAt:has('completedAt')?patch.completedAt:item.completedAt
       });
       return updated;
     });
     this.save(next);
     return updated;
   }
+  startTesting(id,baseline){
+    const now=this.now();
+    return this.update(id,{
+      status:'testing',
+      testingStartedAt:Number(baseline?.startedAt)||now,
+      baseline,
+      finalResult:null,
+      completedAt:0
+    });
+  }
+  complete(id,result){
+    const now=this.now();
+    return this.update(id,{status:'done',finalResult:result,completedAt:now});
+  }
+  reset(id){
+    return this.update(id,{status:'planned',testingStartedAt:0,baseline:null,finalResult:null,completedAt:0});
+  }
   cycle(id){
     const item=this.all().find(row=>row.id===id);if(!item)return null;
-    const index=IMPROVEMENT_STATUSES.indexOf(item.status);
-    return this.update(id,{status:IMPROVEMENT_STATUSES[(index+1)%IMPROVEMENT_STATUSES.length]});
+    if(item.status==='planned')return this.update(id,{status:'testing',testingStartedAt:this.now()});
+    if(item.status==='testing')return this.complete(id,null);
+    return this.reset(id);
   }
   remove(id){
     const next=this.all().filter(item=>item.id!==id);

@@ -112,3 +112,34 @@ test('remove deletes only the selected experiment and status labels stay stable'
   assert.equal(experimentStatusLabel('testing'),'TESTING');
   assert.equal(experimentStatusLabel('done'),'DONE');
 });
+
+test('testing lifecycle preserves baseline and freezes final result',()=>{
+  let now=100;
+  const store=new ImprovementQueueStore(memoryStorage(),()=>now++);
+  const {item}=store.add({gameId:'code',title:'説明改善'});
+  const baseline={startedAt:200,cohort:{mode:'party',difficulty:null,label:'Party'},count:3,axes:{fun:3,clarity:2,brain:4,replay:3},quality:8/3};
+  const testing=store.startTesting(item.id,baseline);
+  assert.equal(testing.status,'testing');
+  assert.equal(testing.testingStartedAt,200);
+  assert.equal(testing.baseline.count,3);
+  const result={ready:true,outcome:'improved',cohort:baseline.cohort,baselineCount:3,afterCount:4,beforeQuality:2.67,afterQuality:3.67,qualityDelta:1,axes:[{id:'clarity',before:2,after:4,delta:2}]};
+  const done=store.complete(item.id,result);
+  assert.equal(done.status,'done');
+  assert.equal(done.finalResult.outcome,'improved');
+  assert.equal(done.finalResult.afterCount,4);
+  assert.ok(done.completedAt>0);
+});
+
+test('reset clears testing baseline and frozen result completely',()=>{
+  let now=1;
+  const store=new ImprovementQueueStore(memoryStorage(),()=>now++);
+  const {item}=store.add({gameId:'memory',title:'Hard調整'});
+  store.startTesting(item.id,{startedAt:10,cohort:{mode:'single',difficulty:'hard',label:'Hard'},count:2,axes:{fun:3,clarity:3,brain:5,replay:2},quality:8/3});
+  store.complete(item.id,{ready:false,outcome:'collecting',cohort:{mode:'single',difficulty:'hard',label:'Hard'},baselineCount:2,afterCount:1,axes:[]});
+  const planned=store.reset(item.id);
+  assert.equal(planned.status,'planned');
+  assert.equal(planned.testingStartedAt,0);
+  assert.equal(planned.baseline,null);
+  assert.equal(planned.finalResult,null);
+  assert.equal(planned.completedAt,0);
+});
