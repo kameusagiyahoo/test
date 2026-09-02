@@ -1,6 +1,15 @@
 import {getGame} from '../core/registry.js';
 import {escapeHtml as esc,oneDecimal,scoreButtons} from './presentation.js';
 
+export function hasCompletePlaytestScores(scores){
+  return ['fun','clarity','brain','replay'].every(key=>Number(scores?.[key])>=1&&Number(scores?.[key])<=5);
+}
+
+export function replayRating(replayScore){
+  const score=Number(replayScore);
+  return score>=4?'good':score===3?'neutral':'bad';
+}
+
 export function createPlaytestFeedback({
   app,
   session,
@@ -27,14 +36,14 @@ export function createPlaytestFeedback({
         choice.classList.toggle('selected',selected);
         choice.setAttribute('aria-pressed',String(selected));
       });
-      save.disabled=!['fun','clarity','brain','replay'].every(key=>scores[key]);
+      save.disabled=!hasCompletePlaytestScores(scores);
     });
 
     save.onclick=()=>{
       if(save.disabled)return;
       const result=playtests.submit(gameId,scores);
       playtestEvents.record(gameId,scores,{mode,playerCount,difficulty});
-      ratings.rate(gameId,scores.replay>=4?'good':scores.replay===3?'neutral':'bad');
+      ratings.rate(gameId,replayRating(scores.replay));
       wrap.innerHTML=`<div><div class="eyebrow">SAVED</div><strong>プレイテスト評価を記録しました</strong><div class="feedback-history">面白さ ${oneDecimal(result.fun.average)} · 分かりやすさ ${oneDecimal(result.clarity.average)} · 頭を使う度 ${oneDecimal(result.brain.average)} · また遊びたい ${oneDecimal(result.replay.average)}</div></div>`;
     };
   }
