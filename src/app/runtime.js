@@ -4,7 +4,7 @@ import {createExperimentWorkflow} from './experiment-workflow.js';
 import {createShareActions} from './share-actions.js';
 import {createShellUi} from './shell-ui.js';
 import {startPwaLifecycle} from './pwa-lifecycle.js';
-import {createNavigationHub} from './navigation.js';
+import {createNavigationHub,createRouteTable} from './navigation.js';
 import {createDataVaultScreen} from '../screens/data-vault.js';
 import {createPlayerGroupsScreen} from '../screens/player-groups.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
@@ -41,31 +41,7 @@ export function createAppRuntime({
   }=state;
 
   const navigation=createNavigationHub();
-  const routes={
-    renderHome:navigation.route('renderHome'),
-    disposeActiveGame:navigation.route('disposeActiveGame'),
-    startSmartParty:navigation.route('startSmartParty'),
-    startTrackedSchedule:navigation.route('startTrackedSchedule'),
-    renderSmartPartyPreview:navigation.route('renderSmartPartyPreview'),
-    renderPartySetup:navigation.route('renderPartySetup'),
-    startGame:navigation.route('startGame'),
-    renderGameDetail:navigation.route('renderGameDetail'),
-    renderPartyIntermission:navigation.route('renderPartyIntermission'),
-    renderPlayerGroups:navigation.route('renderPlayerGroups'),
-    renderSavedParties:navigation.route('renderSavedParties'),
-    renderPartyHistory:navigation.route('renderPartyHistory'),
-    renderPartyHistoryDetail:navigation.route('renderPartyHistoryDetail'),
-    renderPlaytestLab:navigation.route('renderPlaytestLab'),
-    renderStatsDashboard:navigation.route('renderStatsDashboard'),
-    renderSeasonBoard:navigation.route('renderSeasonBoard'),
-    renderPlayerProfile:navigation.route('renderPlayerProfile'),
-    renderAchievements:navigation.route('renderAchievements'),
-    renderGameHealth:navigation.route('renderGameHealth'),
-    renderImprovementQueue:navigation.route('renderImprovementQueue'),
-    renderExperimentLearnings:navigation.route('renderExperimentLearnings'),
-    renderDataVault:navigation.route('renderDataVault'),
-    renderGameInsights:navigation.route('renderGameInsights')
-  };
+  const routes=createRouteTable(navigation);
 
   const {toast,updateBadge}=createShellUi({badge,toastElement,session});
   const {sharePartyCard,shareProfileCard}=createShareActions({toast});
@@ -106,8 +82,10 @@ export function createAppRuntime({
     startTrackedSchedule:routes.startTrackedSchedule,
     renderPartyIntermission:routes.renderPartyIntermission
   });
-  navigation.bind('renderPartyHistory',renderPartyHistory);
-  navigation.bind('renderPartyHistoryDetail',renderPartyHistoryDetail);
+  navigation.bindMany({
+    renderPartyHistory,
+    renderPartyHistoryDetail
+  });
 
   navigation.bind('renderSavedParties',createSavedPartiesScreen({
     app,
@@ -147,13 +125,15 @@ export function createAppRuntime({
     sharePartyCard,
     soloDifficultyDetail
   });
-  navigation.bind('disposeActiveGame',partyPlayFlow.disposeActiveGame);
-  navigation.bind('startSmartParty',partyPlayFlow.startSmartParty);
-  navigation.bind('startTrackedSchedule',partyPlayFlow.startTrackedSchedule);
-  navigation.bind('renderSmartPartyPreview',partyPlayFlow.renderSmartPartyPreview);
-  navigation.bind('renderPartySetup',partyPlayFlow.renderPartySetup);
-  navigation.bind('startGame',partyPlayFlow.startGame);
-  navigation.bind('renderPartyIntermission',partyPlayFlow.renderPartyIntermission);
+  navigation.bindMany({
+    disposeActiveGame:partyPlayFlow.disposeActiveGame,
+    startSmartParty:partyPlayFlow.startSmartParty,
+    startTrackedSchedule:partyPlayFlow.startTrackedSchedule,
+    renderSmartPartyPreview:partyPlayFlow.renderSmartPartyPreview,
+    renderPartySetup:partyPlayFlow.renderPartySetup,
+    startGame:partyPlayFlow.startGame,
+    renderPartyIntermission:partyPlayFlow.renderPartyIntermission
+  });
 
   let homeScreen=null;
   navigation.bind('renderPlaytestLab',createPlaytestLabScreen({
@@ -185,10 +165,12 @@ export function createAppRuntime({
     shareProfileCard,
     renderPartyHistoryDetail:routes.renderPartyHistoryDetail
   });
-  navigation.bind('renderSeasonBoard',renderSeasonBoard);
-  navigation.bind('renderStatsDashboard',renderStatsDashboard);
-  navigation.bind('renderPlayerProfile',renderPlayerProfile);
-  navigation.bind('renderAchievements',renderAchievements);
+  navigation.bindMany({
+    renderSeasonBoard,
+    renderStatsDashboard,
+    renderPlayerProfile,
+    renderAchievements
+  });
 
   const experimentWorkflow=createExperimentWorkflow({
     improvementQueue,
@@ -245,9 +227,11 @@ export function createAppRuntime({
     renderGameInsights:routes.renderGameInsights,
     experimentWorkflow
   });
-  navigation.bind('renderGameHealth',renderGameHealth);
-  navigation.bind('renderExperimentLearnings',renderExperimentLearnings);
-  navigation.bind('renderImprovementQueue',renderImprovementQueue);
+  navigation.bindMany({
+    renderGameHealth,
+    renderExperimentLearnings,
+    renderImprovementQueue
+  });
 
   homeScreen=createHomeScreen({
     app,
@@ -293,6 +277,7 @@ export function createAppRuntime({
   };
 
   function start(){
+    navigation.assertAllBound();
     startPwaLifecycle({homeScreen});
     routes.renderHome();
   }
