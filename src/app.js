@@ -6,9 +6,7 @@ import {winnerIndexesFromScores} from './core/stats.js';
 import {buildHealthReport} from './core/health.js';
 import {SOLO_GAME_IDS,SOLO_DIFFICULTIES,normalizeSoloDifficulty,soloDifficultyLabel} from './core/solo.js';
 import {canPromptInstall,isIOS,isOnline,isStandalone,registerPWA,requestInstall,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
-import {backupFilename,backupSummary,clearPartyPocketData,createBackup,parseBackupText,restoreBackup,stringifyBackup} from './core/backup.js';
 import {samePlayers} from './core/groups.js';
-import {partyLeadChanges,partyMvp} from './core/party-history.js';
 import {buildPlayerProfile,buildPlayerProfiles,topPlayerRecords} from './core/player-profile.js';
 import {achievementBoard,achievementSummary,nextMilestones,playerAchievements,unlockedAchievements} from './core/achievements.js';
 import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
@@ -23,6 +21,10 @@ import {buildLearnedRecommendations,contextNeed,healthNeed,learnedRecommendation
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
 import {escapeHtml as esc,oneDecimal,scoreButtons} from './ui/presentation.js';
 import {createAppState} from './app/state.js';
+import {createDataVaultScreen} from './screens/data-vault.js';
+import {createPlayerGroupsScreen} from './screens/player-groups.js';
+import {createPartyHistoryScreens} from './screens/party-history.js';
+import {createSavedPartiesScreen} from './screens/saved-parties.js';
 const {
   session,
   ratings,
@@ -49,7 +51,50 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.32.1';
+const APP_VERSION='8.32.2';
+
+const renderDataVault=createDataVaultScreen({
+  app,
+  appVersion:APP_VERSION,
+  disposeActiveGame,
+  updateBadge,
+  toast,
+  renderHome
+});
+const renderPlayerGroups=createPlayerGroupsScreen({
+  app,
+  session,
+  playerGroups,
+  disposeActiveGame,
+  updateBadge,
+  toast,
+  renderHome
+});
+const {
+  partyRecapHtml,
+  renderPartyHistory,
+  renderPartyHistoryDetail
+}=createPartyHistoryScreens({
+  app,
+  partyHistory,
+  savedParties,
+  disposeActiveGame,
+  updateBadge,
+  toast,
+  renderHome,
+  sharePartyCard,
+  startTrackedSchedule,
+  renderPartyIntermission
+});
+const renderSavedParties=createSavedPartiesScreen({
+  app,
+  savedParties,
+  disposeActiveGame,
+  updateBadge,
+  renderHome,
+  startTrackedSchedule,
+  renderPartyIntermission
+});
 
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
@@ -666,159 +711,6 @@ function renderImprovementQueue(){
     improvementQueue.update(item.id,{note});renderImprovementQueue();
   });
   app.querySelectorAll('[data-queue-delete]').forEach(button=>button.onclick=()=>{if(!confirm('この改善実験を削除しますか？'))return;improvementQueue.remove(button.dataset.queueDelete);renderImprovementQueue()});
-}
-
-function formatBytes(bytes){
-  const value=Number(bytes)||0;
-  if(value<1024)return value+' B';
-  if(value<1024*1024)return (value/1024).toFixed(1)+' KB';
-  return (value/(1024*1024)).toFixed(2)+' MB';
-}
-
-function formatBackupDate(value){
-  if(!value)return'日時不明';
-  const date=new Date(value);
-  return Number.isNaN(date.getTime())?'日時不明':date.toLocaleString('ja-JP');
-}
-
-async function exportPartyPocketBackup(){
-  const backup=createBackup(globalThis.localStorage,{appVersion:APP_VERSION}),textValue=stringifyBackup(backup);
-  const filename=backupFilename(),blob=new Blob([textValue],{type:'application/json'});
-  try{
-    const file=new File([blob],filename,{type:'application/json'});
-    if(navigator.share&&navigator.canShare?.({files:[file]})){
-      await navigator.share({files:[file],title:'Party Pocket Backup'});
-      return;
-    }
-  }catch(error){
-    if(error?.name==='AbortError')return;
-  }
-  const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-  toast('バックアップを書き出しました');
-}
-
-function renderDataVault(){
-  disposeActiveGame();
-  updateBadge('DATA VAULT');
-  const current=createBackup(globalThis.localStorage,{appVersion:APP_VERSION}),summary=backupSummary(current);
-  let pendingBackup=null;
-
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="vaultBack">←</button><div><div class="eyebrow">DATA VAULT</div><div class="screen-title">バックアップと復元</div></div></div>
-  <section class="vault-summary"><div><b>${summary.keyCount}</b><span>保存キー</span></div><div><b>${formatBytes(summary.bytes)}</b><span>バックアップ量</span></div><div><b>v${APP_VERSION}</b><span>現在版</span></div></section>
-  <section class="panel vault-section"><div><div class="eyebrow">EXPORT</div><h3>この端末のデータを保存</h3><p>プレイヤー名、Party設定、履歴、評価、お気に入り、Solo進捗などParty PocketのlocalStorageを1つのJSONへまとめます。</p></div><button class="btn primary full" id="exportBackup">バックアップを書き出す</button></section>
-  <section class="panel vault-section"><div><div class="eyebrow">RESTORE</div><h3>バックアップから復元</h3><p>JSONを検証してから内容を表示します。復元すると、現在のParty Pocketデータはバックアップ内容で置き換わります。</p></div><input id="restoreFile" class="vault-file-input" type="file" accept=".json,application/json"><button class="btn quiet full" id="chooseBackup">バックアップを選ぶ</button><div class="restore-preview" id="restorePreview" hidden></div></section>
-  <section class="panel vault-section danger-zone"><div><div class="eyebrow">RESET</div><h3>端末データを初期化</h3><p>Party Pocketのユーザーデータだけを削除します。アプリ本体・Service Worker・オフラインキャッシュは残ります。</p></div><button class="btn danger full" id="clearData">端末データをすべて削除</button></section>
-  <div class="vault-note">端末変更やSafariのサイトデータ削除前には、先にバックアップを書き出してください。</div>`;
-
-  app.querySelector('#vaultBack').onclick=renderHome;
-  app.querySelector('#exportBackup').onclick=exportPartyPocketBackup;
-  const fileInput=app.querySelector('#restoreFile'),preview=app.querySelector('#restorePreview');
-  app.querySelector('#chooseBackup').onclick=()=>fileInput.click();
-  fileInput.onchange=async()=>{
-    pendingBackup=null;
-    const file=fileInput.files?.[0];
-    if(!file)return;
-    try{
-      const parsed=parseBackupText(await file.text()),info=backupSummary(parsed);
-      pendingBackup=parsed;
-      preview.hidden=false;
-      preview.innerHTML=`<div><div class="eyebrow">VALID BACKUP</div><b>${esc(file.name)}</b><small>作成: ${esc(formatBackupDate(info.exportedAt))}<br>App: ${esc(info.appVersion)} · ${info.keyCount} keys · ${formatBytes(info.bytes)}</small></div><button class="btn primary" id="confirmRestore">このデータを復元</button>`;
-      preview.querySelector('#confirmRestore').onclick=()=>{
-        if(!pendingBackup)return;
-        if(!confirm('現在のParty Pocketデータを、このバックアップ内容で置き換えます。続けますか？'))return;
-        try{restoreBackup(globalThis.localStorage,pendingBackup);location.reload()}
-        catch{toast('復元に失敗しました')}
-      };
-    }catch(error){
-      preview.hidden=false;
-      preview.innerHTML=`<div class="restore-error"><b>読み込めませんでした</b><small>${esc(error?.message||'バックアップ形式を確認してください')}</small></div>`;
-    }
-  };
-  app.querySelector('#clearData').onclick=()=>{
-    if(!confirm('プレイヤー、履歴、評価、Solo進捗などParty Pocketの端末データをすべて削除します。元に戻せません。続けますか？'))return;
-    clearPartyPocketData(globalThis.localStorage);location.reload();
-  };
-}
-
-function renderPlayerGroups(){
-  disposeActiveGame();
-  const groups=playerGroups.recent();
-  updateBadge('PLAYER GROUPS');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="groupsBack">←</button><div><div class="eyebrow">PLAYER GROUPS</div><div class="screen-title">いつものメンバー</div></div></div>
-  <section class="panel group-save-panel"><div><div class="eyebrow">SAVE CURRENT</div><h3>現在の${session.players.length}人を保存</h3><p>${session.players.map(esc).join(' · ')}</p></div><div class="group-save-form"><input id="groupName" maxlength="24" placeholder="例: 家族 / いつもの4人"><button class="btn primary" id="saveGroup">グループ保存</button></div><div class="helper">同じ名前で保存するとメンバーを上書きします。最大8グループ。</div></section>
-  <div class="section-head"><h2>Saved Groups</h2><span class="muted">${groups.length} / 8</span></div>
-  <section class="group-manager-list">${groups.length?groups.map(group=>`<article class="group-manager-row"><div><b>${esc(group.name)}</b><small>${group.players.length}人 · ${group.players.map(esc).join(' · ')}</small></div><div class="group-manager-actions"><button class="btn quiet" data-use-group="${group.id}">呼び出す</button><button class="icon-btn danger-icon" data-delete-group="${group.id}" aria-label="${esc(group.name)}を削除">×</button></div></article>`).join(''):'<div class="catalog-empty">まだ保存グループがありません。</div>'}</section>
-  <div class="vault-note">グループ情報もData Vaultのバックアップに自動で含まれます。</div>`;
-
-  app.querySelector('#groupsBack').onclick=renderHome;
-  app.querySelector('#saveGroup').onclick=()=>{
-    const name=app.querySelector('#groupName').value.trim();
-    if(!name)return toast('グループ名を入力してください');
-    try{playerGroups.save(name,session.players);renderPlayerGroups();toast(name+'を保存しました')}
-    catch(error){toast(error?.message||'保存できませんでした')}
-  };
-  app.querySelectorAll('[data-use-group]').forEach(button=>button.onclick=()=>{
-    const group=playerGroups.get(button.dataset.useGroup);if(!group)return;
-    session.savePlayers(group.players);playerGroups.touch(group.id);renderHome();toast(group.name+'を呼び出しました');
-  });
-  app.querySelectorAll('[data-delete-group]').forEach(button=>button.onclick=()=>{
-    const group=playerGroups.get(button.dataset.deleteGroup);if(!group)return;
-    if(!confirm(group.name+'を削除しますか？'))return;
-    playerGroups.remove(group.id);renderPlayerGroups();
-  });
-}
-
-function formatPartyDate(value){
-  const date=new Date(value);if(Number.isNaN(date.getTime()))return'日時不明';
-  return date.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-function partyRecapHtml(entry,{compact=false}={}){
-  if(!entry)return'';
-  const games=new Map(listGames().map(g=>[g.id,g])),mvp=partyMvp(entry),leadChanges=partyLeadChanges(entry);
-  const ranking=rankScores(entry.finalScores);
-  return `<section class="party-recap ${compact?'compact':''}"><div class="party-recap-head"><div><div class="eyebrow">PARTY RECAP</div><b>${entry.rounds.length}/${entry.schedule.length} rounds recorded</b></div><div class="party-recap-facts"><span>MVP ${mvp?mvp.names.map(esc).join(' & '):'—'}</span><span>首位交代 ${leadChanges}回</span></div></div><div class="party-recap-ranking">${ranking.map(row=>`<div><span>${row.rank}. ${esc(entry.players[row.index])}</span><b>${row.score} pt</b></div>`).join('')}</div><div class="party-recap-rounds">${entry.rounds.map((round,index)=>{const game=games.get(round.gameId),winnerNames=round.winners.map(i=>entry.players[i]).filter(Boolean);return`<div class="party-recap-round"><span class="smart-order">${String(index+1).padStart(2,'0')}</span><span><b>${game?.emoji||''} ${esc(game?.title||round.gameId)}</b><small>${winnerNames.length?`勝者 ${winnerNames.map(esc).join(' & ')}`:'勝者なし'} · ${round.awards.map((v,i)=>v>0?`${esc(entry.players[i])} +${v}`:null).filter(Boolean).join(' / ')||'Party pt なし'}</small></span></div>`}).join('')}</div></section>`;
-}
-
-function renderPartyHistory(){
-  disposeActiveGame();
-  const games=listGames(),ids=games.map(g=>g.id),entries=partyHistory.history(ids);
-  updateBadge('PARTY HISTORY');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="historyBack">←</button><div><div class="eyebrow">PARTY HISTORY</div><div class="screen-title">完了したParty</div></div></div><section class="lab-summary"><div><b>${entries.length}</b><span>保存Party</span></div><div><b>${entries.reduce((sum,e)=>sum+e.rounds.length,0)}</b><span>記録ラウンド</span></div><div><b>${new Set(entries.flatMap(e=>e.players)).size}</b><span>players</span></div></section><div class="lab-note">完走したPartyだけを最大50件保存します。途中離脱は完了履歴には入りません。</div><section class="party-history-list">${entries.length?entries.map(entry=>{const winners=entry.winners.map(i=>entry.players[i]).filter(Boolean);return`<button class="party-history-row" data-history-id="${entry.id}"><span><b>${winners.length?`${winners.map(esc).join(' & ')} 勝利`:'Party結果'}</b><small>${formatPartyDate(entry.completedAt)} · ${entry.players.map(esc).join(' · ')}</small><small>${entry.schedule.length}R · ${entry.finalScores.map((v,i)=>`${esc(entry.players[i])} ${v}`).join(' / ')}</small></span><span class="recommend-arrow">→</span></button>`}).join(''):'<div class="catalog-empty">完了したPartyはまだありません。</div>'}</section>`;
-  app.querySelector('#historyBack').onclick=renderHome;
-  app.querySelectorAll('[data-history-id]').forEach(button=>button.onclick=()=>renderPartyHistoryDetail(button.dataset.historyId));
-}
-
-function renderPartyHistoryDetail(id){
-  disposeActiveGame();
-  const games=listGames(),validIds=games.map(g=>g.id),entry=partyHistory.get(id,validIds);
-  if(!entry)return renderPartyHistory();
-  updateBadge('PARTY RECAP');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="recapBack">←</button><div><div class="eyebrow">PARTY RECAP</div><div class="screen-title">${formatPartyDate(entry.completedAt)}</div></div></div>${partyRecapHtml(entry)}<section class="panel recap-actions"><div><div class="eyebrow">SHARE / REPLAY</div><p>結果画像を共有するか、${entry.schedule.length}ラウンドを同じ順番で再現できます。</p></div><div class="actions"><button class="btn quiet" id="shareHistoryCard">結果画像を共有</button><button class="btn quiet" id="saveHistoryPreset">Saved Partyに保存</button><button class="btn primary" id="replayHistory">同じ構成で再戦</button></div></section>`;
-  app.querySelector('#recapBack').onclick=renderPartyHistory;
-  app.querySelector('#shareHistoryCard').onclick=()=>sharePartyCard(entry);
-  app.querySelector('#replayHistory').onclick=()=>{startTrackedSchedule(entry.schedule);renderPartyIntermission(true)};
-  app.querySelector('#saveHistoryPreset').onclick=()=>{
-    const defaultName='Party '+formatPartyDate(entry.completedAt).replace(/[/:]/g,'-');
-    const name=prompt('Saved Party名',defaultName);if(!name?.trim())return;
-    try{savedParties.save(name.trim(),entry.schedule);toast('Saved Partyに保存しました')}catch(error){toast(error?.message||'保存できませんでした')}
-  };
-}
-
-function renderSavedParties(){
-  disposeActiveGame();
-  const games=listGames(),validIds=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
-  const presets=savedParties.recent(validIds);
-  updateBadge('SAVED PARTIES');
-  app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="savedPartyBack">←</button><div><div class="eyebrow">SAVED PARTIES</div><div class="screen-title">お気に入りの構成</div></div></div>
-  <div class="lab-note">保存したゲーム順をそのまま再現します。Smart Partyや通常Partyのランダム化は行いません。</div>
-  <section class="saved-party-manager">${presets.length?presets.map(preset=>{const rows=preset.schedule.map(id=>byId.get(id)).filter(Boolean),info=summarizeSmartParty(rows);return`<article class="saved-party-manager-row"><div><b>${esc(preset.name)}</b><small>${rows.map(g=>g.emoji+' '+g.title).join(' → ')}</small><small>${preset.schedule.length}R · 約${info.totalMinutes}分</small></div><div class="saved-party-manager-actions"><button class="btn primary" data-run-preset="${preset.id}">開始</button><button class="icon-btn danger-icon" data-delete-preset="${preset.id}" aria-label="${esc(preset.name)}を削除">×</button></div></article>`}).join(''):'<div class="catalog-empty">保存したParty構成はまだありません。</div>'}</section>
-  <div class="vault-note">Party終了画面から最大8件まで保存できます。Data Vaultのバックアップにも含まれます。</div>`;
-  app.querySelector('#savedPartyBack').onclick=renderHome;
-  app.querySelectorAll('[data-run-preset]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.runPreset,validIds);if(!preset)return;savedParties.touch(preset.id);startTrackedSchedule(preset.schedule);renderPartyIntermission(true)});
-  app.querySelectorAll('[data-delete-preset]').forEach(button=>button.onclick=()=>{const preset=savedParties.get(button.dataset.deletePreset,validIds);if(!preset)return;if(!confirm(preset.name+'を削除しますか？'))return;savedParties.remove(preset.id);renderSavedParties()});
 }
 
 function renderSmartPartyPreview(rounds,{players=session.players,allowedGameIds=null}={}){
