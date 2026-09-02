@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
+const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
 const sw=fs.readFileSync('sw.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 
@@ -25,7 +26,7 @@ test('index exposes manifest and iOS standalone metadata',()=>{
 test('service worker precaches core PWA assets and all 24 game modules',()=>{
   const required=[
     './index.html','./styles.css','./strategy.css','./manifest.webmanifest',
-    './icon.svg','./icon-maskable.svg','./src/bootstrap.js','./src/app.js',
+    './icon.svg','./icon-maskable.svg','./src/bootstrap.js','./src/app.js','./src/app/state.js','./src/games/index.js','./src/ui/presentation.js',
     './src/core/pwa.js','./src/core/backup.js','./src/core/groups.js','./src/core/recommender.js','./src/core/party-presets.js','./src/core/party-history.js','./src/core/player-profile.js','./src/core/achievements.js','./src/core/share-card.js','./src/core/season.js','./src/core/game-insights.js','./src/core/playtest-events.js','./src/core/solo-analytics.js','./src/core/improvement-queue.js','./src/core/experiment-evaluation.js','./src/core/experiment-learnings.js','./src/core/learned-recommendations.js','./src/core/session.js','./src/core/catalog.js',
     'sync','bomb','five','minority','sniper','taboo','clock','ten',
     'code','logic','ev','auction','grid','allocation','portfolio','sequence',
@@ -38,7 +39,7 @@ test('service worker precaches core PWA assets and all 24 game modules',()=>{
 });
 
 test('service worker has navigation fallback and versioned cache',()=>{
-  assert.match(sw,/CACHE_NAME='party-pocket-v8\.32\.0'/);
+  assert.ok(sw.includes(`CACHE_NAME='party-pocket-v${pkg.version}'`));
   assert.match(sw,/request\.mode==='navigate'/);
   assert.match(sw,/caches\.match\('\.\/index\.html'\)/);
   assert.match(sw,/SKIP_WAITING/);
