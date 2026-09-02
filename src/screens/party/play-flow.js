@@ -3,6 +3,7 @@ import {categoryLabel,difficultyLabel,gameMeta,playerRangeLabel} from '../../cor
 import {winnerIndexesFromScores} from '../../core/stats.js';
 import {buildHealthReport} from '../../core/health.js';
 import {SOLO_GAME_IDS,normalizeSoloDifficulty,soloDifficultyLabel} from '../../core/solo.js';
+import {samePlayers} from '../../core/groups.js';
 import {
   buildSmartParty,
   buildSmartPartyWithLocks,
