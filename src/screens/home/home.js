@@ -24,6 +24,21 @@ export function pwaStatusLabel(){
   return isStandalone()?'APP':isOnline()?'ONLINE':'OFFLINE';
 }
 
+export function createCatalogState(playerCount){
+  return{
+    category:'all',
+    query:'',
+    difficulty:'all',
+    maxMinutes:'all',
+    playerCount:Number(playerCount)||1,
+    recommendedOnly:true
+  };
+}
+
+export function smartPartyRoundsForCatalog(allowedCount){
+  return Math.min(6,Math.max(3,Number(allowedCount)||0));
+}
+
 export function createHomeScreen({
   app,
   session,
@@ -236,14 +251,7 @@ export function createHomeScreen({
     app.querySelector('#experimentLearnings').onclick=renderExperimentLearnings;
     app.querySelector('#dataVault').onclick=renderDataVault;
 
-    const catalogState={
-      category:'all',
-      query:'',
-      difficulty:'all',
-      maxMinutes:'all',
-      playerCount:session.players.length,
-      recommendedOnly:true
-    };
+    const catalogState=createCatalogState(session.players.length);
     const catalogIndex=new Map(games.map((game,index)=>[game.id,index]));
 
     function paintCatalog(){
@@ -273,7 +281,7 @@ export function createHomeScreen({
       if(session.players.length<2)return toast('Partyは2人以上で遊べます');
       const allowed=filterGames(games,catalogState).map(game=>game.id);
       if(allowed.length<2)return toast('この条件ではPartyを組めません');
-      const rounds=Math.min(6,Math.max(3,allowed.length));
+      const rounds=smartPartyRoundsForCatalog(allowed.length);
       renderSmartPartyPreview(rounds,{allowedGameIds:allowed});
     };
     app.querySelector('#pickOne').onclick=()=>{
