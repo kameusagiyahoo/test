@@ -11,6 +11,7 @@ import {createPartyHistoryScreens} from '../screens/party-history.js';
 import {createSavedPartiesScreen} from '../screens/saved-parties.js';
 import {createPartyPlayFlow} from '../screens/party/play-flow.js';
 import {createHomeScreen} from '../screens/home/home.js';
+import {createHomeContext} from '../screens/home/context.js';
 import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
 import {createPlayerAnalyticsScreens} from '../screens/analytics/player-analytics.js';
 import {createImprovementScreens} from '../screens/analytics/improvement.js';
@@ -235,39 +236,13 @@ export function createAppRuntime({
 
   homeScreen=createHomeScreen({
     app,
-    session,
-    ratings,
-    library,
-    playtests,
-    stats,
-    soloProgress,
-    playerGroups,
-    savedParties,
-    partyHistory,
-    improvementQueue,
-    updateBadge,
-    toast,
-    disposeActiveGame:routes.disposeActiveGame,
-    renderPlayerGroups:routes.renderPlayerGroups,
-    renderSavedParties:routes.renderSavedParties,
-    renderPartyHistory:routes.renderPartyHistory,
-    renderPartyHistoryDetail:routes.renderPartyHistoryDetail,
-    renderPartySetup:routes.renderPartySetup,
-    startSmartParty:routes.startSmartParty,
-    startTrackedSchedule:routes.startTrackedSchedule,
-    renderPartyIntermission:routes.renderPartyIntermission,
-    startGame:routes.startGame,
-    renderGameDetail:routes.renderGameDetail,
-    renderSmartPartyPreview:routes.renderSmartPartyPreview,
-    renderPlaytestLab:routes.renderPlaytestLab,
-    renderStatsDashboard:routes.renderStatsDashboard,
-    renderSeasonBoard:routes.renderSeasonBoard,
-    renderAchievements:routes.renderAchievements,
-    renderGameHealth:routes.renderGameHealth,
-    renderImprovementQueue:routes.renderImprovementQueue,
-    renderExperimentLearnings:routes.renderExperimentLearnings,
-    renderDataVault:routes.renderDataVault,
-    soloDifficultyDetail
+    context:createHomeContext({
+      state,
+      routes,
+      updateBadge,
+      toast,
+      soloDifficultyDetail
+    })
   });
   navigation.bind('renderHome',homeScreen.renderHome);
 
