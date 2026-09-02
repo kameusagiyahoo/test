@@ -11,6 +11,7 @@ const APP_SHELL=[
   './src/games/index.js',
   './src/ui/presentation.js',
   './src/app.js',
+  './src/app/state.js',
   './src/core/session.js',
   './src/core/preferences.js',
   './src/core/registry.js',
