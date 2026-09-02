@@ -23,7 +23,7 @@ import {escapeHtml as esc,oneDecimal,scoreButtons} from './ui/presentation.js';
 import {createAppState} from './app/state.js';
 import {createDataVaultScreen} from './screens/data-vault.js';
 import {createPlayerGroupsScreen} from './screens/player-groups.js';
-import {createPartyHistoryScreens} from './screens/party-history.js';
+import {createPartyHistoryScreens,formatPartyDate} from './screens/party-history.js';
 import {createSavedPartiesScreen} from './screens/saved-parties.js';
 const {
   session,
