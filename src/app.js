@@ -1,7 +1,7 @@
 import {SessionStore,rankScores} from './core/session.js';
 import {RatingStore,PartySettingsStore,LibraryStore,PlaytestStore} from './core/preferences.js';
 import {createLocalTransport} from './core/transport.js';
-import {registerGame,getGame,listGames} from './core/registry.js';
+import {getGame,listGames} from './core/registry.js';
 import {CATEGORY_DEFS,categoriesFor,categoryLabel,difficultyLabel,filterGames,gameMeta,pickGame,playerRangeLabel,recommendedGames} from './core/catalog.js';
 import {gameGuide} from './core/game-guide.js';
 import {StatsStore,winnerIndexesFromScores} from './core/stats.js';
@@ -24,21 +24,7 @@ import {buildExperimentBaseline,evaluateExperiment,experimentOutcomeLabel} from 
 import {buildExperimentLearnings,experimentSourceLabel} from './core/experiment-learnings.js';
 import {buildLearnedRecommendations,contextNeed,healthNeed,learnedRecommendationLabel} from './core/learned-recommendations.js';
 import {buildSmartParty,buildSmartPartyWithLocks,recentGameIdsForPlayers,replaceSmartPartyGame,smartPartyReasons,summarizeSmartParty} from './core/recommender.js';
-import {syncGame} from './games/sync.js';
-import {bombGame} from './games/bomb.js';
-import {fiveGame} from './games/five.js';
-import {minorityGame} from './games/minority.js';
-import {sniperGame} from './games/sniper.js';
-import {tabooGame} from './games/taboo.js';
-import {clockGame} from './games/clock.js';
-import {tenGame} from './games/ten.js';
-import {codeGame} from './games/code.js';
-import {logicGame} from './games/logic.js';
-import {evGame} from './games/ev.js';
-import {auctionGame} from './games/auction.js';
-
-[syncGame,bombGame,fiveGame,minorityGame,sniperGame,tabooGame,clockGame,tenGame,codeGame,logicGame,evGame,auctionGame].forEach(registerGame);
-
+import {escapeHtml as esc,oneDecimal,scoreButtons} from './ui/presentation.js';
 const transport=createLocalTransport();
 const session=new SessionStore({transport});
 const ratings=new RatingStore(globalThis.localStorage);
@@ -64,9 +50,8 @@ let lastSoloResult=null;
 let lastPartyRecap=null;
 let pwaInstallReady=false;
 let pwaUpdateRegistration=null;
-const APP_VERSION='8.32.0';
+const APP_VERSION='8.32.1';
 
-const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
 function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function pwaStatusLabel(){return isStandalone()?'APP':isOnline()?'ONLINE':'OFFLINE'}
@@ -128,14 +113,10 @@ async function shareProfileCard(profile,achievements=[]){
   }catch(error){toast(error?.message||'画像を共有できませんでした')}
 }
 function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
-function oneDecimal(value){return Number.isFinite(value)?value.toFixed(1):'—'}
 function ratingSummary(gameId){
   const p=playtests.get(gameId);
   if(p.responses)return `評価 ${p.responses}回 · 面白さ ${oneDecimal(p.fun.average)}`;
   const r=ratings.get(gameId);return r.total?`旧評価 ${r.total}回`:'';
-}
-function scoreButtons(axis){
-  return [1,2,3,4,5].map(score=>`<button class="score-choice" data-axis="${axis}" data-score="${score}" aria-pressed="false">${score}</button>`).join('');
 }
 function playtestPromptHtml(gameId){
   const game=getGame(gameId);if(!game)return'';const p=playtests.get(gameId);
