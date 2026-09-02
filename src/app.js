@@ -1,11 +1,10 @@
-import {rankScores} from './core/session.js';
-import {listGames} from './core/registry.js';
-import {registerPWA,watchConnectivity,watchInstallPrompt} from './core/pwa.js';
-import {partyShareModel,profileShareModel,renderPartyShareSvg,renderProfileShareSvg,shareCardFilename,shareSvgCard} from './core/share-card.js';
-import {escapeHtml as esc} from './ui/presentation.js';
 import {createPlaytestFeedback} from './ui/playtest-feedback.js';
+import {rankingHtml} from './ui/result-presentation.js';
 import {createAppState} from './app/state.js';
 import {createExperimentWorkflow} from './app/experiment-workflow.js';
+import {createShareActions} from './app/share-actions.js';
+import {createShellUi} from './app/shell-ui.js';
+import {startPwaLifecycle} from './app/pwa-lifecycle.js';
 import {createDataVaultScreen} from './screens/data-vault.js';
 import {createPlayerGroupsScreen} from './screens/player-groups.js';
 import {createPartyHistoryScreens} from './screens/party-history.js';
@@ -38,7 +37,12 @@ const toastEl=document.querySelector('#toast');
 let partyPlayFlow=null;
 let gameDetailScreen=null;
 let homeScreen=null;
-const APP_VERSION='8.32.7';
+const APP_VERSION='8.32.8';
+
+const shellUi=createShellUi({badge,toastElement:toastEl,session});
+const {toast,updateBadge}=shellUi;
+const {sharePartyCard,shareProfileCard}=createShareActions({toast});
+const renderRanking=(scores,unit)=>rankingHtml(scores,session.players,unit);
 
 const renderDataVault=createDataVaultScreen({
   app,
@@ -106,7 +110,7 @@ partyPlayFlow=createPartyPlayFlow({
   renderHome,
   playtestPromptHtml:playtestFeedback.promptHtml,
   bindPlaytest:playtestFeedback.bind,
-  rankingHtml,
+  rankingHtml:renderRanking,
   partyRecapHtml,
   sharePartyCard,
   soloDifficultyDetail
@@ -230,8 +234,6 @@ homeScreen=createHomeScreen({
   soloDifficultyDetail
 });
 
-function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),1500)}
-function updateBadge(text){badge.textContent=text||`${session.players.length}人`}
 function renderHome(){return homeScreen?.renderHome()}
 function disposeActiveGame(){return partyPlayFlow?.disposeActiveGame()}
 function startSmartParty(...args){return partyPlayFlow?.startSmartParty(...args)}
@@ -242,34 +244,8 @@ function startGame(...args){return partyPlayFlow?.startGame(...args)}
 function renderGameDetail(...args){return gameDetailScreen?.renderGameDetail(...args)}
 function renderPartyIntermission(...args){return partyPlayFlow?.renderPartyIntermission(...args)}
 
-function gameNameMap(){
-  return Object.fromEntries(listGames().map(game=>[game.id,game.title]));
-}
-async function sharePartyCard(entry){
-  if(!entry)return toast('共有できるParty結果がありません');
-  try{
-    const model=partyShareModel(entry,{gameNames:gameNameMap()});
-    const svg=renderPartyShareSvg(model);
-    const label=entry.winners?.length?entry.winners.map(i=>entry.players[i]).filter(Boolean).join('-'):'party';
-    const result=await shareSvgCard(svg,{filename:shareCardFilename('party',label),title:'Party Pocket · Party Result'});
-    if(result==='downloaded')toast('結果画像を保存しました');
-  }catch(error){toast(error?.message||'画像を共有できませんでした')}
-}
-async function shareProfileCard(profile,achievements=[]){
-  if(!profile)return toast('共有できるプロフィールがありません');
-  try{
-    const model=profileShareModel(profile,{gameNames:gameNameMap(),achievements});
-    const svg=renderProfileShareSvg(model);
-    const result=await shareSvgCard(svg,{filename:shareCardFilename('profile',profile.name),title:'Party Pocket · Player Profile'});
-    if(result==='downloaded')toast('プロフィール画像を保存しました');
-  }catch(error){toast(error?.message||'画像を共有できませんでした')}
-}
-function rankingHtml(scores,unit){return rankScores(scores).map(row=>`<div class="result-row"><span>${row.rank}. ${esc(session.players[row.index])}</span><span>${row.score} ${unit}</span></div>`).join('')}
 homeButton.onclick=()=>{disposeActiveGame();renderHome()};
 
-watchInstallPrompt(ready=>homeScreen?.setInstallReady(ready));
-watchConnectivity(()=>homeScreen?.refreshIfVisible());
-registerPWA(registration=>homeScreen?.setUpdateRegistration(registration));
-navigator.serviceWorker?.addEventListener?.('controllerchange',()=>location.reload());
+startPwaLifecycle({homeScreen});
 
 renderHome();
