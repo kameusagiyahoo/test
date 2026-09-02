@@ -26,7 +26,7 @@ test('index exposes manifest and iOS standalone metadata',()=>{
 test('service worker precaches core PWA assets and all 24 game modules',()=>{
   const required=[
     './index.html','./styles.css','./strategy.css','./manifest.webmanifest',
-    './icon.svg','./icon-maskable.svg','./src/bootstrap.js','./src/app.js','./src/app/state.js','./src/games/index.js','./src/ui/presentation.js','./src/screens/data-vault.js','./src/screens/player-groups.js','./src/screens/party-history.js','./src/screens/saved-parties.js',
+    './icon.svg','./icon-maskable.svg','./src/bootstrap.js','./src/app.js','./src/app/state.js','./src/games/index.js','./src/ui/presentation.js','./src/screens/data-vault.js','./src/screens/player-groups.js','./src/screens/party-history.js','./src/screens/saved-parties.js','./src/screens/analytics/playtest-lab.js','./src/screens/analytics/player-analytics.js','./src/screens/analytics/improvement.js',
     './src/core/pwa.js','./src/core/backup.js','./src/core/groups.js','./src/core/recommender.js','./src/core/party-presets.js','./src/core/party-history.js','./src/core/player-profile.js','./src/core/achievements.js','./src/core/share-card.js','./src/core/season.js','./src/core/game-insights.js','./src/core/playtest-events.js','./src/core/solo-analytics.js','./src/core/improvement-queue.js','./src/core/experiment-evaluation.js','./src/core/experiment-learnings.js','./src/core/learned-recommendations.js','./src/core/session.js','./src/core/catalog.js',
     'sync','bomb','five','minority','sniper','taboo','clock','ten',
     'code','logic','ev','auction','grid','allocation','portfolio','sequence',
