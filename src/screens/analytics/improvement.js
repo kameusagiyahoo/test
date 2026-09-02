@@ -3,6 +3,7 @@ import {buildHealthReport} from '../../core/health.js';
 import {experimentOutcomeLabel} from '../../core/experiment-evaluation.js';
 import {buildExperimentLearnings,experimentSourceLabel} from '../../core/experiment-learnings.js';
 import {escapeHtml as esc} from '../../ui/presentation.js';
+import {healthStatusLabel,insightAxisLabel} from './game-insights.js';
 
 export function createImprovementScreens({
   app,
@@ -13,12 +14,7 @@ export function createImprovementScreens({
   updateBadge,
   renderHome,
   renderGameInsights,
-  experimentEvaluation,
-  experimentAdvanceLabel,
-  experimentOutcomeClass,
-  advanceExperiment,
-  insightAxisLabel,
-  healthStatusLabel
+  experimentWorkflow
 }){
   function renderGameHealth(){
     disposeActiveGame();
@@ -74,11 +70,11 @@ export function createImprovementScreens({
     app.innerHTML=`<div class="game-top"><button class="btn back quiet" id="queueBack">←</button><div><div class="eyebrow">IMPROVEMENT QUEUE</div><div class="screen-title">改善実験</div></div></div>
     <section class="health-summary improvement-summary"><div><b>${summary.testing}</b><span>TESTING</span></div><div><b>${summary.planned}</b><span>PLANNED</span></div><div><b>${summary.done}</b><span>DONE</span></div><div><b>${summary.games}</b><span>games</span></div></section>
     <div class="lab-note">PLANNED→TESTINGで開始前レビューをBaselineとして固定し、開始後レビューをAfterとして比較します。Baseline 2件 + After 3件以上で自動判定。条件を満たすまでDONEには進めず、DONE時点の結果を固定保存します。</div><button class="btn quiet full" id="queueLearnings">完了実験の学びを見る</button>
-    <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId),result=experimentEvaluation(item);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p>${result?`<section class="experiment-result ${experimentOutcomeClass(result)}"><div class="experiment-result-head"><b>${experimentOutcomeLabel(result.outcome)}</b><span>${esc(result.cohort?.label||'All reviews')}</span></div><div class="experiment-result-counts"><span>Before ${result.baselineCount}</span><span>After ${result.afterCount}</span><span>必要 After 3</span></div><div class="experiment-axis-deltas">${result.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${Number.isFinite(axis.delta)?`${axis.delta>0?'+':''}${axis.delta.toFixed(1)}`:'—'}</b></span>`).join('')}</div></section>`:''}</div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentAdvanceLabel(item)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
+    <section class="improvement-board">${rows.length?rows.map(item=>{const game=byId.get(item.gameId),result=experimentWorkflow.evaluation(item);return`<article class="improvement-card ${item.status}"><button class="improvement-game" data-queue-game="${item.gameId}"><span class="lab-symbol">${game?.emoji||''}</span><span><b>${esc(game?.title||item.gameId)}</b><small>${item.source.kind==='health'?'Health Finding':item.source.kind==='context'?'Context Signal':'Manual'}</small></span></button><div class="improvement-body"><b>${esc(item.title)}</b><p>${esc(item.note||item.source.detail||item.source.action||'メモなし')}</p>${result?`<section class="experiment-result ${experimentWorkflow.outcomeClass(result)}"><div class="experiment-result-head"><b>${experimentOutcomeLabel(result.outcome)}</b><span>${esc(result.cohort?.label||'All reviews')}</span></div><div class="experiment-result-counts"><span>Before ${result.baselineCount}</span><span>After ${result.afterCount}</span><span>必要 After 3</span></div><div class="experiment-axis-deltas">${result.axes.map(axis=>`<span><i>${insightAxisLabel(axis.id)}</i><b>${Number.isFinite(axis.delta)?`${axis.delta>0?'+':''}${axis.delta.toFixed(1)}`:'—'}</b></span>`).join('')}</div></section>`:''}</div><div class="improvement-actions"><button class="experiment-status ${item.status}" data-queue-cycle="${item.id}">${experimentWorkflow.advanceLabel(item)}</button><button class="mini-action" data-queue-note="${item.id}">メモ</button><button class="mini-action danger-text" data-queue-delete="${item.id}">削除</button></div></article>`}).join(''):'<div class="catalog-empty">改善実験はまだありません。Game Insightsから追加してください。</div>'}</section>`;
     app.querySelector('#queueBack').onclick=renderHome;
     app.querySelector('#queueLearnings').onclick=renderExperimentLearnings;
     app.querySelectorAll('[data-queue-game]').forEach(button=>button.onclick=()=>renderGameInsights(button.dataset.queueGame));
-    app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{advanceExperiment(button.dataset.queueCycle);renderImprovementQueue()});
+    app.querySelectorAll('[data-queue-cycle]').forEach(button=>button.onclick=()=>{experimentWorkflow.advance(button.dataset.queueCycle);renderImprovementQueue()});
     app.querySelectorAll('[data-queue-note]').forEach(button=>button.onclick=()=>{
       const item=rows.find(row=>row.id===button.dataset.queueNote);if(!item)return;
       const note=prompt('検証メモ',item.note||item.source.action||'');if(note==null)return;
