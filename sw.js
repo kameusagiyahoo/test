@@ -1,4 +1,4 @@
-const CACHE_NAME='party-pocket-v8.32.0';
+const CACHE_NAME='party-pocket-v8.32.1';
 const APP_SHELL=[
   './',
   './index.html',
@@ -8,6 +8,8 @@ const APP_SHELL=[
   './icon.svg',
   './icon-maskable.svg',
   './src/bootstrap.js',
+  './src/games/index.js',
+  './src/ui/presentation.js',
   './src/app.js',
   './src/core/session.js',
   './src/core/preferences.js',
