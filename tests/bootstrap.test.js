@@ -1,12 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {registerGame,getGame} from '../src/core/registry.js';
-import {gridGame} from '../src/games/grid.js';
-import {allocationGame} from '../src/games/allocation.js';
-import {portfolioGame} from '../src/games/portfolio.js';
+import {readdir} from 'node:fs/promises';
+import {ALL_GAMES} from '../src/games/index.js';
 
-test('advanced strategy games are valid registry modules',()=>{
-  for(const game of [gridGame,allocationGame,portfolioGame]){
-    registerGame(game);assert.equal(getGame(game.id),game);assert.equal(typeof game.mount,'function');
+test('game index registers every game module exactly once',async()=>{
+  const files=(await readdir(new URL('../src/games/',import.meta.url)))
+    .filter(name=>name.endsWith('.js')&&name!=='index.js')
+    .map(name=>name.slice(0,-3))
+    .sort();
+  const ids=ALL_GAMES.map(game=>game.id).sort();
+
+  assert.deepEqual(ids,files);
+  assert.equal(new Set(ids).size,ids.length);
+  for(const game of ALL_GAMES){
+    assert.equal(typeof game.mount,'function');
   }
 });
