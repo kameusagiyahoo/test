@@ -39,42 +39,42 @@ export function smartPartyRoundsForCatalog(allowedCount){
   return Math.min(6,Math.max(3,Number(allowedCount)||0));
 }
 
-export function createHomeScreen({
-  app,
-  session,
-  ratings,
-  library,
-  playtests,
-  stats,
-  soloProgress,
-  playerGroups,
-  savedParties,
-  partyHistory,
-  improvementQueue,
-  updateBadge,
-  toast,
-  disposeActiveGame,
-  renderPlayerGroups,
-  renderSavedParties,
-  renderPartyHistory,
-  renderPartyHistoryDetail,
-  renderPartySetup,
-  startSmartParty,
-  startTrackedSchedule,
-  renderPartyIntermission,
-  startGame,
-  renderGameDetail,
-  renderSmartPartyPreview,
-  renderPlaytestLab,
-  renderStatsDashboard,
-  renderSeasonBoard,
-  renderAchievements,
-  renderGameHealth,
-  renderImprovementQueue,
-  renderExperimentLearnings,
-  renderDataVault,
-  soloDifficultyDetail
-}){
+export function createHomeScreen({app,context}){
+  const {
+    session,
+    ratings,
+    library,
+    playtests,
+    stats,
+    soloProgress,
+    playerGroups,
+    savedParties,
+    partyHistory,
+    improvementQueue
+  }=context.stores;
+  const {
+    disposeActiveGame,
+    renderPlayerGroups,
+    renderSavedParties,
+    renderPartyHistory,
+    renderPartyHistoryDetail,
+    renderPartySetup,
+    startSmartParty,
+    startTrackedSchedule,
+    renderPartyIntermission,
+    startGame,
+    renderGameDetail,
+    renderSmartPartyPreview,
+    renderPlaytestLab,
+    renderStatsDashboard,
+    renderSeasonBoard,
+    renderAchievements,
+    renderGameHealth,
+    renderImprovementQueue,
+    renderExperimentLearnings,
+    renderDataVault
+  }=context.routes;
+  const {updateBadge,toast,soloDifficultyDetail}=context.services;
   let draftPlayers=[...session.players];
   let installReady=false;
   let updateRegistration=null;
