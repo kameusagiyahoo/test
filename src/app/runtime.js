@@ -7,6 +7,7 @@ import {startPwaLifecycle} from './pwa-lifecycle.js';
 import {createNavigationHub,createRouteTable} from './navigation.js';
 import {createDataVaultScreen} from '../screens/data-vault.js';
 import {createPlayerGroupsScreen} from '../screens/player-groups.js';
+import {createPlayerGroupsContext} from '../screens/player-groups-context.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
 import {createPartyHistoryContext} from '../screens/party-history-context.js';
 import {createSavedPartiesScreen} from '../screens/saved-parties.js';
@@ -66,12 +67,12 @@ export function createAppRuntime({
 
   navigation.bind('renderPlayerGroups',createPlayerGroupsScreen({
     app,
-    session,
-    playerGroups,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    toast,
-    renderHome:routes.renderHome
+    context:createPlayerGroupsContext({
+      state,
+      routes,
+      updateBadge,
+      toast
+    })
   }));
 
   const {
