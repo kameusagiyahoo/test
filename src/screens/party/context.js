@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Party Flow');
+
 export const PARTY_FLOW_STORE_KEYS=Object.freeze([
   'session',
   'partySettings',
@@ -23,19 +27,6 @@ export const PARTY_FLOW_SERVICE_KEYS=Object.freeze([
   'updateBadge',
   'toast'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Party Flow ${label}: ${key}`);
-    if(functions&&typeof value!=='function'){
-      throw new TypeError(`Party Flow ${label} must be a function: ${key}`);
-    }
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 export function createPartyFlowContext({
   state,
