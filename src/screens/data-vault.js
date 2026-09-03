@@ -22,15 +22,10 @@ export function formatBackupDate(value){
   return Number.isNaN(date.getTime())?'日時不明':date.toLocaleString('ja-JP');
 }
 
-export function createDataVaultScreen({
-  app,
-  appVersion,
-  disposeActiveGame,
-  updateBadge,
-  toast,
-  renderHome,
-  storage=globalThis.localStorage
-}){
+export function createDataVaultScreen({app,context}){
+  const {disposeActiveGame,renderHome}=context.routes;
+  const {updateBadge,toast}=context.services;
+  const {appVersion,storage}=context.config;
   async function exportPartyPocketBackup(){
     const backup=createBackup(storage,{appVersion}),textValue=stringifyBackup(backup);
     const filename=backupFilename(),blob=new Blob([textValue],{type:'application/json'});
