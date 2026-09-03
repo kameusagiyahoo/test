@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Game Insights');
+
 export const GAME_INSIGHTS_STORE_KEYS=Object.freeze([
   'playtests',
   'playtestEvents',
@@ -26,19 +30,6 @@ export const EXPERIMENT_WORKFLOW_METHODS=Object.freeze([
   'advanceLabel',
   'advance'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Game Insights ${label}: ${key}`);
-    if(functions&&typeof value!=='function'){
-      throw new TypeError(`Game Insights ${label} must be a function: ${key}`);
-    }
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 function validateExperimentWorkflow(workflow){
   if(!workflow)throw new Error('missing Game Insights service: experimentWorkflow');
