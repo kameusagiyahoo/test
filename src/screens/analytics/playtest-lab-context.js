@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Playtest Lab');
+
 export const PLAYTEST_LAB_STORE_KEYS=Object.freeze([
   'playtests',
   'playtestEvents'
@@ -12,19 +16,6 @@ export const PLAYTEST_LAB_SERVICE_KEYS=Object.freeze([
   'updateBadge',
   'openGameDetail'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Playtest Lab ${label}: ${key}`);
-    if(functions&&typeof value!=='function'){
-      throw new TypeError(`Playtest Lab ${label} must be a function: ${key}`);
-    }
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 export function createPlaytestLabContext({
   state,

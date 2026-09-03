@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Home');
+
 export const HOME_STATE_KEYS=Object.freeze([
   'session',
   'ratings',
@@ -33,17 +37,6 @@ export const HOME_ROUTE_KEYS=Object.freeze([
   'renderExperimentLearnings',
   'renderDataVault'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Home ${label}: ${key}`);
-    if(functions&&typeof value!=='function')throw new TypeError(`Home ${label} must be a function: ${key}`);
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 export function createHomeContext({
   state,

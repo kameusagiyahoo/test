@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Party History');
+
 export const PARTY_HISTORY_STORE_KEYS=Object.freeze([
   'partyHistory',
   'savedParties'
@@ -15,19 +19,6 @@ export const PARTY_HISTORY_SERVICE_KEYS=Object.freeze([
   'toast',
   'sharePartyCard'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Party History ${label}: ${key}`);
-    if(functions&&typeof value!=='function'){
-      throw new TypeError(`Party History ${label} must be a function: ${key}`);
-    }
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 export function createPartyHistoryContext({
   state,

@@ -1,3 +1,7 @@
+import {createRequiredPicker} from '../app/context-contract.js';
+
+const pickRequired=createRequiredPicker('Data Vault');
+
 export const DATA_VAULT_ROUTE_KEYS=Object.freeze([
   'disposeActiveGame',
   'renderHome'
@@ -14,19 +18,6 @@ export const DATA_VAULT_STORAGE_METHODS=Object.freeze([
   'setItem',
   'removeItem'
 ]);
-
-function pickRequired(source,keys,label,{functions=false}={}){
-  const result={};
-  for(const key of keys){
-    const value=source?.[key];
-    if(value==null)throw new Error(`missing Data Vault ${label}: ${key}`);
-    if(functions&&typeof value!=='function'){
-      throw new TypeError(`Data Vault ${label} must be a function: ${key}`);
-    }
-    result[key]=value;
-  }
-  return Object.freeze(result);
-}
 
 function validateStorage(storage){
   if(!storage)throw new Error('missing Data Vault config: storage');
