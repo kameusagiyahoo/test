@@ -17,6 +17,7 @@ import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
 import {createPlayerAnalyticsScreens} from '../screens/analytics/player-analytics.js';
 import {createImprovementScreens} from '../screens/analytics/improvement.js';
 import {createGameInsightsScreen} from '../screens/analytics/game-insights.js';
+import {createGameInsightsContext} from '../screens/analytics/game-insights-context.js';
 import {createGameDetailScreen,soloDifficultyDetail} from '../screens/game-detail/game-detail.js';
 
 export function createAppRuntime({
@@ -182,19 +183,14 @@ export function createAppRuntime({
     renderGameInsights
   }=createGameInsightsScreen({
     app,
-    playtests,
-    playtestEvents,
-    stats,
-    soloProgress,
-    improvementQueue,
-    experimentWorkflow,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    toast,
-    renderHome:routes.renderHome,
-    renderGameDetail:routes.renderGameDetail,
-    renderPlayerProfile:routes.renderPlayerProfile,
-    soloDifficultyDetail
+    context:createGameInsightsContext({
+      state,
+      routes,
+      experimentWorkflow,
+      updateBadge,
+      toast,
+      soloDifficultyDetail
+    })
   });
   navigation.bind('renderGameInsights',renderGameInsights);
 

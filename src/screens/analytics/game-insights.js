@@ -31,22 +31,26 @@ export function percent(value){
   return `${Math.round((Number(value)||0)*100)}%`;
 }
 
-export function createGameInsightsScreen({
-  app,
-  playtests,
-  playtestEvents,
-  stats,
-  soloProgress,
-  improvementQueue,
-  experimentWorkflow,
-  disposeActiveGame,
-  updateBadge,
-  toast,
-  renderHome,
-  renderGameDetail,
-  renderPlayerProfile,
-  soloDifficultyDetail
-}){
+export function createGameInsightsScreen({app,context}){
+  const {
+    playtests,
+    playtestEvents,
+    stats,
+    soloProgress,
+    improvementQueue
+  }=context.stores;
+  const {
+    disposeActiveGame,
+    renderHome,
+    renderGameDetail,
+    renderPlayerProfile
+  }=context.routes;
+  const {
+    experimentWorkflow,
+    updateBadge,
+    toast,
+    soloDifficultyDetail
+  }=context.services;
   function gameInsightData(id){
     const ids=listGames().map(game=>game.id),playtest=playtests.get(id),report=stats.report(ids);
     const statRow=report.gameStats.find(row=>row.gameId===id);
