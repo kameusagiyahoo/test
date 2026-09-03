@@ -15,6 +15,7 @@ import {createPartyFlowContext} from '../screens/party/context.js';
 import {createHomeScreen} from '../screens/home/home.js';
 import {createHomeContext} from '../screens/home/context.js';
 import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
+import {createPlaytestLabContext} from '../screens/analytics/playtest-lab-context.js';
 import {createPlayerAnalyticsScreens} from '../screens/analytics/player-analytics.js';
 import {createPlayerAnalyticsContext} from '../screens/analytics/player-analytics-context.js';
 import {createImprovementScreens} from '../screens/analytics/improvement.js';
@@ -140,15 +141,15 @@ export function createAppRuntime({
   let homeScreen=null;
   navigation.bind('renderPlaytestLab',createPlaytestLabScreen({
     app,
-    playtests,
-    playtestEvents,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    renderHome:routes.renderHome,
-    openGameDetail:id=>{
-      homeScreen?.saveDraft({quiet:true});
-      routes.renderGameDetail(id);
-    }
+    context:createPlaytestLabContext({
+      state,
+      routes,
+      updateBadge,
+      openGameDetail:id=>{
+        homeScreen?.saveDraft({quiet:true});
+        routes.renderGameDetail(id);
+      }
+    })
   }));
 
   const {

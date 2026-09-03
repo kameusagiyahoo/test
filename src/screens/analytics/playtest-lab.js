@@ -16,15 +16,10 @@ export function weakestAxis(row){
   return `${axes[0][0]} ${oneDecimal(axes[0][1])}`;
 }
 
-export function createPlaytestLabScreen({
-  app,
-  playtests,
-  playtestEvents,
-  disposeActiveGame,
-  updateBadge,
-  renderHome,
-  openGameDetail
-}){
+export function createPlaytestLabScreen({app,context}){
+  const {playtests,playtestEvents}=context.stores;
+  const {disposeActiveGame,renderHome}=context.routes;
+  const {updateBadge,openGameDetail}=context.services;
   return function renderPlaytestLab(){
     disposeActiveGame();
     const games=listGames(),byId=new Map(games.map(game=>[game.id,game]));
