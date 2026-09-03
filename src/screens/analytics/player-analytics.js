@@ -23,17 +23,15 @@ export function profileResultLabel(result){
   return result==='win'?'勝':result==='draw'?'分':'敗';
 }
 
-export function createPlayerAnalyticsScreens({
-  app,
-  stats,
-  partyHistory,
-  disposeActiveGame,
-  updateBadge,
-  renderHome,
-  renderGameDetail,
-  shareProfileCard,
-  renderPartyHistoryDetail
-}){
+export function createPlayerAnalyticsScreens({app,context}){
+  const {stats,partyHistory}=context.stores;
+  const {
+    disposeActiveGame,
+    renderHome,
+    renderGameDetail,
+    renderPartyHistoryDetail
+  }=context.routes;
+  const {updateBadge,shareProfileCard}=context.services;
   function renderSeasonBoard(selectedKey=currentSeasonKey()){
     disposeActiveGame();
     const games=listGames(),ids=games.map(game=>game.id);
