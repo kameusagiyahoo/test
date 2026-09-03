@@ -8,18 +8,15 @@ export function formatPartyDate(value){
   return date.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
-export function createPartyHistoryScreens({
-  app,
-  partyHistory,
-  savedParties,
-  disposeActiveGame,
-  updateBadge,
-  toast,
-  renderHome,
-  sharePartyCard,
-  startTrackedSchedule,
-  renderPartyIntermission
-}){
+export function createPartyHistoryScreens({app,context}){
+  const {partyHistory,savedParties}=context.stores;
+  const {
+    disposeActiveGame,
+    renderHome,
+    startTrackedSchedule,
+    renderPartyIntermission
+  }=context.routes;
+  const {updateBadge,toast,sharePartyCard}=context.services;
   function partyRecapHtml(entry,{compact=false}={}){
     if(!entry)return'';
     const games=new Map(listGames().map(g=>[g.id,g])),mvp=partyMvp(entry),leadChanges=partyLeadChanges(entry);

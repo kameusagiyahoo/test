@@ -8,6 +8,7 @@ import {createNavigationHub,createRouteTable} from './navigation.js';
 import {createDataVaultScreen} from '../screens/data-vault.js';
 import {createPlayerGroupsScreen} from '../screens/player-groups.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
+import {createPartyHistoryContext} from '../screens/party-history-context.js';
 import {createSavedPartiesScreen} from '../screens/saved-parties.js';
 import {createPartyPlayFlow} from '../screens/party/play-flow.js';
 import {createPartyFlowContext} from '../screens/party/context.js';
@@ -77,15 +78,13 @@ export function createAppRuntime({
     renderPartyHistoryDetail
   }=createPartyHistoryScreens({
     app,
-    partyHistory,
-    savedParties,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    toast,
-    renderHome:routes.renderHome,
-    sharePartyCard,
-    startTrackedSchedule:routes.startTrackedSchedule,
-    renderPartyIntermission:routes.renderPartyIntermission
+    context:createPartyHistoryContext({
+      state,
+      routes,
+      updateBadge,
+      toast,
+      sharePartyCard
+    })
   });
   navigation.bindMany({
     renderPartyHistory,
