@@ -22,6 +22,7 @@ import {createImprovementContext} from '../screens/analytics/improvement-context
 import {createGameInsightsScreen} from '../screens/analytics/game-insights.js';
 import {createGameInsightsContext} from '../screens/analytics/game-insights-context.js';
 import {createGameDetailScreen,soloDifficultyDetail} from '../screens/game-detail/game-detail.js';
+import {createGameDetailContext} from '../screens/game-detail/context.js';
 
 export function createAppRuntime({
   state,
@@ -195,14 +196,12 @@ export function createAppRuntime({
 
   const gameDetailScreen=createGameDetailScreen({
     app,
-    session,
-    library,
-    gameInsightData,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    renderHome:routes.renderHome,
-    renderGameInsights:routes.renderGameInsights,
-    startGame:routes.startGame
+    context:createGameDetailContext({
+      state,
+      routes,
+      updateBadge,
+      gameInsightData
+    })
   });
   navigation.bind('renderGameDetail',gameDetailScreen.renderGameDetail);
 
