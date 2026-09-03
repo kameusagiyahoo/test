@@ -1,14 +1,9 @@
 import {escapeHtml as esc} from '../ui/presentation.js';
 
-export function createPlayerGroupsScreen({
-  app,
-  session,
-  playerGroups,
-  disposeActiveGame,
-  updateBadge,
-  toast,
-  renderHome
-}){
+export function createPlayerGroupsScreen({app,context}){
+  const {session,playerGroups}=context.stores;
+  const {disposeActiveGame,renderHome}=context.routes;
+  const {updateBadge,toast}=context.services;
   function renderPlayerGroups(){
     disposeActiveGame();
     const groups=playerGroups.recent();
