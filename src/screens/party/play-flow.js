@@ -26,26 +26,27 @@ export function partyPresetMap(){
   };
 }
 
-export function createPartyPlayFlow({
-  app,
-  session,
-  partySettings,
-  library,
-  playtests,
-  stats,
-  soloProgress,
-  partyHistory,
-  savedParties,
-  updateBadge,
-  toast,
-  renderHome,
-  playtestPromptHtml,
-  bindPlaytest,
-  rankingHtml,
-  partyRecapHtml,
-  sharePartyCard,
-  soloDifficultyDetail
-}){
+export function createPartyPlayFlow({app,context}){
+  const {
+    session,
+    partySettings,
+    library,
+    playtests,
+    stats,
+    soloProgress,
+    partyHistory,
+    savedParties
+  }=context.stores;
+  const {
+    renderHome,
+    playtestPromptHtml,
+    bindPlaytest,
+    rankingHtml,
+    partyRecapHtml,
+    sharePartyCard,
+    soloDifficultyDetail
+  }=context.callbacks;
+  const {updateBadge,toast}=context.services;
   let activeCleanup=null;
   let lastSingleGameId=null;
   let soloRun=null;
