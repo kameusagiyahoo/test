@@ -10,6 +10,7 @@ import {createPlayerGroupsScreen} from '../screens/player-groups.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
 import {createSavedPartiesScreen} from '../screens/saved-parties.js';
 import {createPartyPlayFlow} from '../screens/party/play-flow.js';
+import {createPartyFlowContext} from '../screens/party/context.js';
 import {createHomeScreen} from '../screens/home/home.js';
 import {createHomeContext} from '../screens/home/context.js';
 import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
@@ -108,23 +109,20 @@ export function createAppRuntime({
 
   const partyPlayFlow=createPartyPlayFlow({
     app,
-    session,
-    partySettings,
-    library,
-    playtests,
-    stats,
-    soloProgress,
-    partyHistory,
-    savedParties,
-    updateBadge,
-    toast,
-    renderHome:routes.renderHome,
-    playtestPromptHtml:playtestFeedback.promptHtml,
-    bindPlaytest:playtestFeedback.bind,
-    rankingHtml:renderRanking,
-    partyRecapHtml,
-    sharePartyCard,
-    soloDifficultyDetail
+    context:createPartyFlowContext({
+      state,
+      callbacks:{
+        renderHome:routes.renderHome,
+        playtestPromptHtml:playtestFeedback.promptHtml,
+        bindPlaytest:playtestFeedback.bind,
+        rankingHtml:renderRanking,
+        partyRecapHtml,
+        sharePartyCard,
+        soloDifficultyDetail
+      },
+      updateBadge,
+      toast
+    })
   });
   navigation.bindMany({
     disposeActiveGame:partyPlayFlow.disposeActiveGame,
