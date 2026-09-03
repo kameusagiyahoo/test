@@ -17,6 +17,7 @@ import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
 import {createPlayerAnalyticsScreens} from '../screens/analytics/player-analytics.js';
 import {createPlayerAnalyticsContext} from '../screens/analytics/player-analytics-context.js';
 import {createImprovementScreens} from '../screens/analytics/improvement.js';
+import {createImprovementContext} from '../screens/analytics/improvement-context.js';
 import {createGameInsightsScreen} from '../screens/analytics/game-insights.js';
 import {createGameInsightsContext} from '../screens/analytics/game-insights-context.js';
 import {createGameDetailScreen,soloDifficultyDetail} from '../screens/game-detail/game-detail.js';
@@ -212,14 +213,12 @@ export function createAppRuntime({
     renderImprovementQueue
   }=createImprovementScreens({
     app,
-    playtests,
-    stats,
-    improvementQueue,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    renderHome:routes.renderHome,
-    renderGameInsights:routes.renderGameInsights,
-    experimentWorkflow
+    context:createImprovementContext({
+      state,
+      routes,
+      updateBadge,
+      experimentWorkflow
+    })
   });
   navigation.bindMany({
     renderGameHealth,

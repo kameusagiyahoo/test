@@ -5,17 +5,10 @@ import {buildExperimentLearnings,experimentSourceLabel} from '../../core/experim
 import {escapeHtml as esc} from '../../ui/presentation.js';
 import {healthStatusLabel,insightAxisLabel} from './game-insights.js';
 
-export function createImprovementScreens({
-  app,
-  playtests,
-  stats,
-  improvementQueue,
-  disposeActiveGame,
-  updateBadge,
-  renderHome,
-  renderGameInsights,
-  experimentWorkflow
-}){
+export function createImprovementScreens({app,context}){
+  const {playtests,stats,improvementQueue}=context.stores;
+  const {disposeActiveGame,renderHome,renderGameInsights}=context.routes;
+  const {updateBadge,experimentWorkflow}=context.services;
   function renderGameHealth(){
     disposeActiveGame();
     const games=listGames(),ids=games.map(game=>game.id),byId=new Map(games.map(game=>[game.id,game]));
