@@ -11,6 +11,7 @@ import {createPlayerGroupsContext} from '../screens/player-groups-context.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
 import {createPartyHistoryContext} from '../screens/party-history-context.js';
 import {createSavedPartiesScreen} from '../screens/saved-parties.js';
+import {createSavedPartiesContext} from '../screens/saved-parties-context.js';
 import {createPartyPlayFlow} from '../screens/party/play-flow.js';
 import {createPartyFlowContext} from '../screens/party/context.js';
 import {createHomeScreen} from '../screens/home/home.js';
@@ -96,12 +97,11 @@ export function createAppRuntime({
 
   navigation.bind('renderSavedParties',createSavedPartiesScreen({
     app,
-    savedParties,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    renderHome:routes.renderHome,
-    startTrackedSchedule:routes.startTrackedSchedule,
-    renderPartyIntermission:routes.renderPartyIntermission
+    context:createSavedPartiesContext({
+      state,
+      routes,
+      updateBadge
+    })
   }));
 
   const playtestFeedback=createPlaytestFeedback({

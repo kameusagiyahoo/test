@@ -2,15 +2,15 @@ import {listGames} from '../core/registry.js';
 import {summarizeSmartParty} from '../core/recommender.js';
 import {escapeHtml as esc} from '../ui/presentation.js';
 
-export function createSavedPartiesScreen({
-  app,
-  savedParties,
-  disposeActiveGame,
-  updateBadge,
-  renderHome,
-  startTrackedSchedule,
-  renderPartyIntermission
-}){
+export function createSavedPartiesScreen({app,context}){
+  const {savedParties}=context.stores;
+  const {
+    disposeActiveGame,
+    renderHome,
+    startTrackedSchedule,
+    renderPartyIntermission
+  }=context.routes;
+  const {updateBadge}=context.services;
   function renderSavedParties(){
     disposeActiveGame();
     const games=listGames(),validIds=games.map(g=>g.id),byId=new Map(games.map(g=>[g.id,g]));
