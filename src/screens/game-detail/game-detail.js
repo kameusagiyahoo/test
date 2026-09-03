@@ -16,17 +16,15 @@ export function soloDifficultyDetail(gameId,difficulty){
   return details[gameId]?.[level]||soloDifficultyLabel(level);
 }
 
-export function createGameDetailScreen({
-  app,
-  session,
-  library,
-  gameInsightData,
-  disposeActiveGame,
-  updateBadge,
-  renderHome,
-  renderGameInsights,
-  startGame
-}){
+export function createGameDetailScreen({app,context}){
+  const {session,library}=context.stores;
+  const {
+    disposeActiveGame,
+    renderHome,
+    renderGameInsights,
+    startGame
+  }=context.routes;
+  const {updateBadge,gameInsightData}=context.services;
   function renderGameDetail(id,difficulty='normal'){
     disposeActiveGame();
     const game=getGame(id);if(!game)return renderHome();
