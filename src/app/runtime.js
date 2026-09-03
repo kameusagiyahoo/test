@@ -15,6 +15,7 @@ import {createHomeScreen} from '../screens/home/home.js';
 import {createHomeContext} from '../screens/home/context.js';
 import {createPlaytestLabScreen} from '../screens/analytics/playtest-lab.js';
 import {createPlayerAnalyticsScreens} from '../screens/analytics/player-analytics.js';
+import {createPlayerAnalyticsContext} from '../screens/analytics/player-analytics-context.js';
 import {createImprovementScreens} from '../screens/analytics/improvement.js';
 import {createGameInsightsScreen} from '../screens/analytics/game-insights.js';
 import {createGameInsightsContext} from '../screens/analytics/game-insights-context.js';
@@ -156,14 +157,12 @@ export function createAppRuntime({
     renderAchievements
   }=createPlayerAnalyticsScreens({
     app,
-    stats,
-    partyHistory,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    renderHome:routes.renderHome,
-    renderGameDetail:routes.renderGameDetail,
-    shareProfileCard,
-    renderPartyHistoryDetail:routes.renderPartyHistoryDetail
+    context:createPlayerAnalyticsContext({
+      state,
+      routes,
+      updateBadge,
+      shareProfileCard
+    })
   });
   navigation.bindMany({
     renderSeasonBoard,
