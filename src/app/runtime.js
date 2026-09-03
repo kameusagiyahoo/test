@@ -6,6 +6,7 @@ import {createShellUi} from './shell-ui.js';
 import {startPwaLifecycle} from './pwa-lifecycle.js';
 import {createNavigationHub,createRouteTable} from './navigation.js';
 import {createDataVaultScreen} from '../screens/data-vault.js';
+import {createDataVaultContext} from '../screens/data-vault-context.js';
 import {createPlayerGroupsScreen} from '../screens/player-groups.js';
 import {createPlayerGroupsContext} from '../screens/player-groups-context.js';
 import {createPartyHistoryScreens} from '../screens/party-history.js';
@@ -59,11 +60,12 @@ export function createAppRuntime({
 
   navigation.bind('renderDataVault',createDataVaultScreen({
     app,
-    appVersion,
-    disposeActiveGame:routes.disposeActiveGame,
-    updateBadge,
-    toast,
-    renderHome:routes.renderHome
+    context:createDataVaultContext({
+      routes,
+      updateBadge,
+      toast,
+      appVersion
+    })
   }));
 
   navigation.bind('renderPlayerGroups',createPlayerGroupsScreen({
